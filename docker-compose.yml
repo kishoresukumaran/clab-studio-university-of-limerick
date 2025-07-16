@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  containerlab-designer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: containerlab-designer
+    ports:
+      - "80:80"
+    restart: unless-stopped
+    networks:
+      - containerlab-network
+
+networks:
+  containerlab-network:
+    name: containerlab-network
+    driver: bridge 
