@@ -75,12 +75,12 @@ After=docker.service
 Requires=docker.service
 
 [Service]
-Type=simple
+Type=oneshot
+RemainAfterExit=yes
 WorkingDirectory=$CURRENT_DIR
-ExecStart=/usr/bin/docker compose up
+ExecStart=/usr/bin/docker compose up -d
 ExecStop=/usr/bin/docker compose down
-Restart=on-failure
-RestartSec=10
+TimeoutStartSec=0
 
 [Install]
 WantedBy=multi-user.target
