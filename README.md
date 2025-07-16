@@ -207,4 +207,4 @@ All three components must be installed and running for the complete system to fu
 
 ## License
 
-Copyright (c) 2024-2025 Arista Networks, Inc.
+Copyright (c) 2024-2025 Kishore Sukumaran
