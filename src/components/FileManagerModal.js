@@ -13,7 +13,7 @@ const getDirname = (filepath) => {
 
 const FileManagerModal = ({ isOpen, onClose, onImport, username, mode, title }) => {
   const [servers, setServers] = useState([
-    { ip: "10.83.12.237", name: "clab-ire-1" }
+    { ip: "10.83.12.237", name: "ul-clab-1" }
   ]);
   const [expandedServers, setExpandedServers] = useState({});
   const [fileContents, setFileContents] = useState({});
@@ -33,7 +33,6 @@ const FileManagerModal = ({ isOpen, onClose, onImport, username, mode, title }) 
   const [newFileContent, setNewFileContent] = useState('');
   const [activeServer, setActiveServer] = useState(null);
   const fileInputRef = useRef(null);
-  const [showAdvancedServers, setShowAdvancedServers] = useState(false); // State for Advanced section in import mode
   const [copiedItem, setCopiedItem] = useState(null); // New state for copied item
   const [copiedItems, setCopiedItems] = useState([]); // New state for multiple copied items
   const [showRenameDialog, setShowRenameDialog] = useState(false); // State for rename dialog
@@ -47,10 +46,15 @@ const FileManagerModal = ({ isOpen, onClose, onImport, username, mode, title }) 
 
   useEffect(() => {
     const initialPaths = {};
+    const initialExpandedState = {};
+    
     servers.forEach(server => {
       initialPaths[server.ip] = `/home/clab_nfs_share/containerlab_topologies/${username}`;
+      initialExpandedState[server.ip] = true; // Always expanded by default
     });
+    
     setCurrentPaths(initialPaths);
+    setExpandedServers(initialExpandedState);
     
     // Initialize the default server (clab-ire-3) for different modes
     // This ensures file management buttons work by setting the activeServer state
@@ -60,18 +64,26 @@ const FileManagerModal = ({ isOpen, onClose, onImport, username, mode, title }) 
         const defaultImportPath = `/home/clab_nfs_share/containerlab_topologies/${username}`;
         setCurrentPaths(prev => ({ ...prev, [clabIre3.ip]: defaultImportPath }));
         fetchContents(clabIre3.ip, defaultImportPath);
-        setExpandedServers(prev => ({ ...prev, [clabIre3.ip]: true }));
         setActiveServer(clabIre3.ip); // Set active server for import/select mode
       }
+      
+      // Also fetch content for other servers
+      servers.filter(server => server.name !== 'clab-ire-3').forEach(server => {
+        fetchContents(server.ip, initialPaths[server.ip]);
+      });
     } else if (mode === 'save') {
       const clabIre3 = servers.find(server => server.name === 'clab-ire-3');
       if (clabIre3) {
         const initialPath = `/home/clab_nfs_share/containerlab_topologies/${username}`;
         setSelectedFile({ serverIp: clabIre3.ip, path: initialPath });
-        setExpandedServers(prev => ({ ...prev, [clabIre3.ip]: true }));
         fetchContents(clabIre3.ip, initialPath);
         setActiveServer(clabIre3.ip); // Set active server for save mode
       }
+      
+      // Also fetch content for other servers
+      servers.filter(server => server.name !== 'clab-ire-3').forEach(server => {
+        fetchContents(server.ip, initialPaths[server.ip]);
+      });
     }
   }, [servers, username, mode]);
 
@@ -103,23 +115,9 @@ const FileManagerModal = ({ isOpen, onClose, onImport, username, mode, title }) 
     };
   }, []);
 
-  const toggleServer = async (serverIp) => {
-    const newExpandedState = !expandedServers[serverIp];
-    
-    setExpandedServers(prev => ({
-      ...prev,
-      [serverIp]: newExpandedState
-    }));
-
-    if (newExpandedState) {
-      await fetchContents(serverIp, currentPaths[serverIp]);
-      
-      if (mode === 'save') {
-        setSelectedFile({ serverIp, path: currentPaths[serverIp] });
-      }
-      
-      setActiveServer(serverIp);
-    }
+  // Instead, create a function to set active server without toggling visibility
+  const setServerActive = (serverIp) => {
+    setActiveServer(serverIp);
   };
 
   const fetchContents = async (serverIp, path) => {
@@ -1234,6 +1232,7 @@ const FileManagerModal = ({ isOpen, onClose, onImport, username, mode, title }) 
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                   <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/>
                                 </svg>
+                                Refresh
                               </button>
                             </>
                           )}
@@ -1331,271 +1330,257 @@ const FileManagerModal = ({ isOpen, onClose, onImport, username, mode, title }) 
                   </div>
                 ))}
 
-              <div>
-                <h3
-                  className="settings-heading"
-                  onClick={() => setShowAdvancedServers(!showAdvancedServers)}
-                  style={{ cursor: 'pointer', marginTop: '20px' }}
-                >
-                  Advanced {showAdvancedServers ? '▲' : '▼'}
-                </h3>
-                {showAdvancedServers && (
-                  <div>
-                    {servers
-                      .filter(server => server.name !== 'clab-ire-3')
-                      .map(server => (
-                        <div key={server.ip} className="server-section">
-                          <div 
-                            className="server-header" 
-                            onClick={() => toggleServer(server.ip)}
-                            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+              <div style={{ marginTop: '20px' }}>
+                {servers
+                  .filter(server => server.name !== 'clab-ire-3')
+                  .map(server => (
+                    <div key={server.ip} className="server-section">
+                      <div 
+                        className="server-header" 
+                        onClick={() => setServerActive(server.ip)}
+                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                      >
+                      </div>
+                       
+                      {/* Always show server contents without conditional rendering */}
+                      <div className="server-contents" style={{ marginLeft: '20px' }}>
+                        <div className="path-navigation" style={{ display: 'flex', alignItems: 'center', margin: '10px 0', gap: '10px' }}>
+                          <button 
+                            onClick={() => navigateUp(server.ip)}
+                            style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '5px',
+                              padding: '4px 8px',
+                              border: '1px solid #3b82f6',
+                              borderRadius: '4px',
+                              background: '#3b82f6',
+                              color: 'white',
+                              fontWeight: '500',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.background = '#2563eb';
+                              e.currentTarget.style.borderColor = '#2563eb';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.background = '#3b82f6';
+                              e.currentTarget.style.borderColor = '#3b82f6';
+                            }}
                           >
-                            {expandedServers[server.ip] ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
-                            <span>{server.name} ({server.ip})</span>
+                            <ArrowUp size={16} /> Up
+                          </button>
+                          <div 
+                            style={{ 
+                              overflowX: 'auto', 
+                              whiteSpace: 'nowrap', 
+                              padding: '5px', 
+                              border: mode === 'save' && selectedFile?.serverIp === server.ip && selectedFile?.path === currentPaths[server.ip] 
+                                ? '2px solid #10b981' 
+                                : '1px solid #eee', 
+                              borderRadius: '4px', 
+                              flexGrow: 1,
+                              backgroundColor: mode === 'save' && selectedFile?.serverIp === server.ip && selectedFile?.path === currentPaths[server.ip]
+                                ? '#d1fae5'
+                                : 'transparent'
+                            }}
+                          >
+                            {currentPaths[server.ip]}
+                            {mode === 'save' && selectedFile?.serverIp === server.ip && selectedFile?.path === currentPaths[server.ip] && (
+                              <span style={{ marginLeft: '10px', color: '#047857', fontWeight: 'bold' }}>
+                                (Selected for saving)
+                              </span>
+                            )}
                           </div>
-                           
-                          {expandedServers[server.ip] && (
-                            <div className="server-contents" style={{ marginLeft: '20px' }}>
-                              <div className="path-navigation" style={{ display: 'flex', alignItems: 'center', margin: '10px 0', gap: '10px' }}>
-                                <button 
-                                  onClick={() => navigateUp(server.ip)}
+                        </div>
+
+                        {/* Show file management options for import, save, select, and manage modes */}
+                        {(mode === 'import' || mode === 'save' || mode === 'select' || mode === 'manage') && (
+                          <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                            {selectedItems.length === 0 && (
+                              <>
+                                <button
+                                  onClick={() => openCreateFolderDialog(server.ip)}
+                                  disabled={!activeServer || activeServer !== server.ip}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
+                                >
+                                  <Plus size={16} /> Folder
+                                </button>
+                                <button
+                                  onClick={() => openCreateFileDialog(server.ip)}
+                                  disabled={!activeServer || activeServer !== server.ip}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
+                                >
+                                  <PlusCircle size={16} /> File
+                                </button>
+                              </>
+                            )}
+                            <button
+                              onClick={handleCopy}
+                              disabled={(!selectedItems.length > 0 && !selectedFile && !selectedFolder) || activeServer !== server.ip}
+                              style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
+                            >
+                              <Copy size={16} /> Copy
+                            </button>
+                            {selectedItems.length === 0 && (
+                              <button
+                                onClick={handlePaste}
+                                disabled={(!copiedItems?.length && !copiedItem) || activeServer !== server.ip}
+                                style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
+                              >
+                                <Clipboard size={16} /> Paste
+                              </button>
+                            )}
+                            <button
+                              onClick={handleDeleteFile}
+                              disabled={(!selectedItems.length > 0 && !selectedFile && !selectedFolder) || activeServer !== server.ip}
+                              style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', background: '#dc3545', color: 'white' }}
+                            >
+                              <Trash size={16} /> Delete
+                            </button>
+                            {selectedItems.length === 0 && (
+                              <>
+                                <button
+                                  onClick={handleRenameClick}
+                                  disabled={(!selectedFile && !selectedFolder) || activeServer !== server.ip}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
+                                >
+                                  <Pencil size={16} /> Rename
+                                </button>
+                                <button
+                                  onClick={handleEditClick}
+                                  disabled={!selectedFile || selectedFolder || activeServer !== server.ip}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
+                                >
+                                  <Edit size={16} /> Edit
+                                </button>
+                                <input
+                                  type="file"
+                                  ref={fileInputRef}
+                                  onChange={(event) => handleFileUpload(event, server.ip)}
+                                  style={{ display: 'none' }}
+                                />
+                                <button
+                                  onClick={handleUploadClick}
+                                  disabled={!activeServer || activeServer !== server.ip}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
+                                >
+                                  <Upload size={16} /> Upload
+                                </button>
+                                <button
+                                  onClick={() => fetchContents(server.ip, currentPaths[server.ip])}
+                                  disabled={!activeServer || activeServer !== server.ip}
                                   style={{ 
                                     display: 'flex', 
                                     alignItems: 'center', 
-                                    gap: '5px',
-                                    padding: '4px 8px',
-                                    border: '1px solid #3b82f6',
-                                    borderRadius: '4px',
-                                    background: '#3b82f6',
-                                    color: 'white',
-                                    fontWeight: '500',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s ease',
-                                    boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                                  }}
-                                  onMouseOver={(e) => {
-                                    e.currentTarget.style.background = '#2563eb';
-                                    e.currentTarget.style.borderColor = '#2563eb';
-                                  }}
-                                  onMouseOut={(e) => {
-                                    e.currentTarget.style.background = '#3b82f6';
-                                    e.currentTarget.style.borderColor = '#3b82f6';
+                                    gap: '5px', 
+                                    padding: '6px 12px',
+                                    backgroundColor: '#4CAF50',
+                                    color: 'white'
                                   }}
                                 >
-                                  <ArrowUp size={16} /> Up
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/>
+                                  </svg>
+                                  Refresh
                                 </button>
-                                <div 
+                              </>
+                            )}
+                          </div>
+                        )}
+
+                        {loading && activeServer === server.ip && <p>Loading...</p>}
+                        {fileContents[`${server.ip}:${currentPaths[server.ip]}`]?.map(item => {
+                          // Handle loading state
+                          if (item.type === 'loading') {
+                            return (
+                              <div key="loading" style={{ padding: '10px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <svg 
+                                  xmlns="http://www.w3.org/2000/svg" 
+                                  width="16" 
+                                  height="16" 
+                                  viewBox="0 0 24 24" 
+                                  fill="none" 
+                                  stroke="currentColor" 
+                                  strokeWidth="2" 
+                                  strokeLinecap="round" 
+                                  strokeLinejoin="round"
                                   style={{ 
-                                    overflowX: 'auto', 
-                                    whiteSpace: 'nowrap', 
-                                    padding: '5px', 
-                                    border: mode === 'save' && selectedFile?.serverIp === server.ip && selectedFile?.path === currentPaths[server.ip] 
-                                      ? '2px solid #10b981' 
-                                      : '1px solid #eee', 
-                                    borderRadius: '4px', 
-                                    flexGrow: 1,
-                                    backgroundColor: mode === 'save' && selectedFile?.serverIp === server.ip && selectedFile?.path === currentPaths[server.ip]
-                                      ? '#d1fae5'
-                                      : 'transparent'
+                                    animation: 'spin 1s linear infinite',
                                   }}
                                 >
-                                  {currentPaths[server.ip]}
-                                  {mode === 'save' && selectedFile?.serverIp === server.ip && selectedFile?.path === currentPaths[server.ip] && (
-                                    <span style={{ marginLeft: '10px', color: '#047857', fontWeight: 'bold' }}>
-                                      (Selected for saving)
-                                    </span>
-                                  )}
-                                </div>
+                                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                                </svg>
+                                <span>Loading directory contents...</span>
                               </div>
+                            );
+                          }
+                          
+                          // Handle error state
+                          if (item.type === 'error') {
+                            return (
+                              <div key="error" style={{ padding: '10px 0', color: '#dc3545', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <circle cx="12" cy="12" r="10" />
+                                  <line x1="12" y1="8" x2="12" y2="12" />
+                                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                                </svg>
+                                <span>{item.name}</span>
+                              </div>
+                            );
+                          }
+                          
+                          const isSelected = 
+                            (item.type === 'directory' && selectedFolder?.serverIp === server.ip && selectedFolder?.path === item.path) ||
+                            (item.type !== 'directory' && selectedFile?.serverIp === server.ip && selectedFile?.path === item.path);
+                            
+                            // Check if item is in the multi-select list
+                            const isMultiSelected = selectedItems.some(
+                              selectedItem => selectedItem.serverIp === server.ip && selectedItem.path === item.path
+                            );
 
-                              {/* Show file management options for import, save, select, and manage modes */}
-                              {(mode === 'import' || mode === 'save' || mode === 'select' || mode === 'manage') && (
-                                <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-                                  {selectedItems.length === 0 && (
-                                    <>
-                                      <button
-                                        onClick={() => openCreateFolderDialog(server.ip)}
-                                        disabled={!activeServer || activeServer !== server.ip}
-                                        style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
-                                      >
-                                        <Plus size={16} /> Folder
-                                      </button>
-                                      <button
-                                        onClick={() => openCreateFileDialog(server.ip)}
-                                        disabled={!activeServer || activeServer !== server.ip}
-                                        style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
-                                      >
-                                        <PlusCircle size={16} /> File
-                                      </button>
-                                    </>
-                                  )}
-                                  <button
-                                    onClick={handleCopy}
-                                    disabled={(!selectedItems.length > 0 && !selectedFile && !selectedFolder) || activeServer !== server.ip}
-                                    style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
-                                  >
-                                    <Copy size={16} /> Copy
-                                  </button>
-                                  {selectedItems.length === 0 && (
-                                    <button
-                                      onClick={handlePaste}
-                                      disabled={(!copiedItems?.length && !copiedItem) || activeServer !== server.ip}
-                                      style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
-                                    >
-                                      <Clipboard size={16} /> Paste
-                                    </button>
-                                  )}
-                                  <button
-                                    onClick={handleDeleteFile}
-                                    disabled={(!selectedItems.length > 0 && !selectedFile && !selectedFolder) || activeServer !== server.ip}
-                                    style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', background: '#dc3545', color: 'white' }}
-                                  >
-                                    <Trash size={16} /> Delete
-                                  </button>
-                                  {selectedItems.length === 0 && (
-                                    <>
-                                      <button
-                                        onClick={handleRenameClick}
-                                        disabled={(!selectedFile && !selectedFolder) || activeServer !== server.ip}
-                                        style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
-                                      >
-                                        <Pencil size={16} /> Rename
-                                      </button>
-                                      <button
-                                        onClick={handleEditClick}
-                                        disabled={!selectedFile || selectedFolder || activeServer !== server.ip}
-                                        style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
-                                      >
-                                        <Edit size={16} /> Edit
-                                      </button>
-                                      <input
-                                        type="file"
-                                        ref={fileInputRef}
-                                        onChange={(event) => handleFileUpload(event, server.ip)}
-                                        style={{ display: 'none' }}
-                                      />
-                                      <button
-                                        onClick={handleUploadClick}
-                                        disabled={!activeServer || activeServer !== server.ip}
-                                        style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
-                                      >
-                                        <Upload size={16} /> Upload
-                                      </button>
-                                      <button
-                                        onClick={() => fetchContents(server.ip, currentPaths[server.ip])}
-                                        disabled={!activeServer || activeServer !== server.ip}
-                                        style={{ 
-                                          display: 'flex', 
-                                          alignItems: 'center', 
-                                          gap: '5px', 
-                                          padding: '6px 12px',
-                                          backgroundColor: '#4CAF50',
-                                          color: 'white'
-                                        }}
-                                      >
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/>
-                                        </svg>
-                                        Refresh
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
-                              )}
-
-                              {loading && activeServer === server.ip && <p>Loading...</p>}
-                              {fileContents[`${server.ip}:${currentPaths[server.ip]}`]?.map(item => {
-                                // Handle loading state
-                                if (item.type === 'loading') {
-                                  return (
-                                    <div key="loading" style={{ padding: '10px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                      <svg 
-                                        xmlns="http://www.w3.org/2000/svg" 
-                                        width="16" 
-                                        height="16" 
-                                        viewBox="0 0 24 24" 
-                                        fill="none" 
-                                        stroke="currentColor" 
-                                        strokeWidth="2" 
-                                        strokeLinecap="round" 
-                                        strokeLinejoin="round"
-                                        style={{ 
-                                          animation: 'spin 1s linear infinite',
-                                        }}
-                                      >
-                                        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                                      </svg>
-                                      <span>Loading directory contents...</span>
-                                    </div>
-                                  );
-                                }
-                                
-                                // Handle error state
-                                if (item.type === 'error') {
-                                  return (
-                                    <div key="error" style={{ padding: '10px 0', color: '#dc3545', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <circle cx="12" cy="12" r="10" />
-                                        <line x1="12" y1="8" x2="12" y2="12" />
-                                        <line x1="12" y1="16" x2="12.01" y2="16" />
-                                      </svg>
-                                      <span>{item.name}</span>
-                                    </div>
-                                  );
-                                }
-                                
-                                const isSelected = 
-                                  (item.type === 'directory' && selectedFolder?.serverIp === server.ip && selectedFolder?.path === item.path) ||
-                                  (item.type !== 'directory' && selectedFile?.serverIp === server.ip && selectedFile?.path === item.path);
-                                  
-                                  // Check if item is in the multi-select list
-                                  const isMultiSelected = selectedItems.some(
-                                    selectedItem => selectedItem.serverIp === server.ip && selectedItem.path === item.path
-                                  );
-
-                                  return (
-                                    <div 
-                                      key={item.path} 
-                                      onClick={(event) => item.type === 'directory' ? handleFolderClick(server.ip, item.path, event) : handleFileClick(server.ip, item.path, event)}
-                                      onDoubleClick={() => item.type === 'directory' ? handleFolderDoubleClick(server.ip, item.path) : null}
-                                      style={{
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        padding: '5px 0',
-                                        fontWeight: (isSelected || isMultiSelected) ? 'bold' : 'normal',
-                                        backgroundColor: isMultiSelected ? '#e3f2fd' : isSelected ? '#e2e8f0' : 'transparent',
-                                        borderRadius: '4px',
-                                        paddingLeft: '5px',
-                                        border: isMultiSelected ? '1px solid #2196F3' : 'none'
-                                      }}
-                                    >
-                                      {isMultiSelected && (
-                                        <div style={{ 
-                                          backgroundColor: '#2196F3', 
-                                          borderRadius: '50%', 
-                                          width: '16px', 
-                                          height: '16px',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          marginRight: '4px'
-                                        }}>
-                                          <Check size={12} color="white" />
-                                        </div>
-                                      )}
-                                      {item.type === 'directory' ? <Folder size={16} /> : <File size={16} />}
-                                      {item.name}
-                                    </div>
-                                  );
-                                })}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                  </div>
-                )}
+                            return (
+                              <div 
+                                key={item.path} 
+                                onClick={(event) => item.type === 'directory' ? handleFolderClick(server.ip, item.path, event) : handleFileClick(server.ip, item.path, event)}
+                                onDoubleClick={() => item.type === 'directory' ? handleFolderDoubleClick(server.ip, item.path) : null}
+                                style={{
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  padding: '5px 0',
+                                  fontWeight: (isSelected || isMultiSelected) ? 'bold' : 'normal',
+                                  backgroundColor: isMultiSelected ? '#e3f2fd' : isSelected ? '#e2e8f0' : 'transparent',
+                                  borderRadius: '4px',
+                                  paddingLeft: '5px',
+                                  border: isMultiSelected ? '1px solid #2196F3' : 'none'
+                                }}
+                              >
+                                {isMultiSelected && (
+                                  <div style={{ 
+                                    backgroundColor: '#2196F3', 
+                                    borderRadius: '50%', 
+                                    width: '16px', 
+                                    height: '16px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    marginRight: '4px'
+                                  }}>
+                                    <Check size={12} color="white" />
+                                  </div>
+                                )}
+                                {item.type === 'directory' ? <Folder size={16} /> : <File size={16} />}
+                                {item.name}
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  ))}
               </div>
             </>
           ) : (
@@ -1603,251 +1588,250 @@ const FileManagerModal = ({ isOpen, onClose, onImport, username, mode, title }) 
               <div key={server.ip} className="server-section">
                 <div 
                   className="server-header" 
-                  onClick={() => toggleServer(server.ip)}
+                  onClick={() => setServerActive(server.ip)}
                   style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
                 >
-                  {expandedServers[server.ip] ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+                  {/* Remove the chevron icons */}
                   <span>{server.name} ({server.ip})</span>
                 </div>
                  
-                {expandedServers[server.ip] && (
-                  <div className="server-contents" style={{ marginLeft: '20px' }}>
-                    <div className="path-navigation" style={{ display: 'flex', alignItems: 'center', margin: '10px 0', gap: '10px' }}>
-                      <button 
-                        onClick={() => navigateUp(server.ip)}
-                        style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '5px',
-                          padding: '4px 8px',
-                          border: '1px solid #3b82f6',
-                          borderRadius: '4px',
-                          background: '#3b82f6',
-                          color: 'white',
-                          fontWeight: '500',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = '#2563eb';
-                          e.currentTarget.style.borderColor = '#2563eb';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = '#3b82f6';
-                          e.currentTarget.style.borderColor = '#3b82f6';
-                        }}
-                      >
-                        <ArrowUp size={16} /> Up
-                      </button>
-                      <div 
-                        style={{ 
-                          overflowX: 'auto', 
-                          whiteSpace: 'nowrap', 
-                          padding: '5px', 
-                          border: mode === 'save' && selectedFile?.serverIp === server.ip && selectedFile?.path === currentPaths[server.ip] 
-                            ? '2px solid #10b981' 
-                            : '1px solid #eee', 
-                          borderRadius: '4px', 
-                          flexGrow: 1,
-                          backgroundColor: mode === 'save' && selectedFile?.serverIp === server.ip && selectedFile?.path === currentPaths[server.ip]
-                            ? '#d1fae5'
-                            : 'transparent'
-                        }}
-                      >
-                        {currentPaths[server.ip]}
-                        {mode === 'save' && selectedFile?.serverIp === server.ip && selectedFile?.path === currentPaths[server.ip] && (
-                          <span style={{ marginLeft: '10px', color: '#047857', fontWeight: 'bold' }}>
-                            (Selected for saving)
-                          </span>
-                        )}
-                      </div>
+                {/* Always show server contents without conditional rendering */}
+                <div className="server-contents" style={{ marginLeft: '20px' }}>
+                  <div className="path-navigation" style={{ display: 'flex', alignItems: 'center', margin: '10px 0', gap: '10px' }}>
+                    <button 
+                      onClick={() => navigateUp(server.ip)}
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '5px',
+                        padding: '4px 8px',
+                        border: '1px solid #3b82f6',
+                        borderRadius: '4px',
+                        background: '#3b82f6',
+                        color: 'white',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = '#2563eb';
+                        e.currentTarget.style.borderColor = '#2563eb';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = '#3b82f6';
+                        e.currentTarget.style.borderColor = '#3b82f6';
+                      }}
+                    >
+                      <ArrowUp size={16} /> Up
+                    </button>
+                    <div 
+                      style={{ 
+                        overflowX: 'auto', 
+                        whiteSpace: 'nowrap', 
+                        padding: '5px', 
+                        border: mode === 'save' && selectedFile?.serverIp === server.ip && selectedFile?.path === currentPaths[server.ip] 
+                          ? '2px solid #10b981' 
+                          : '1px solid #eee', 
+                        borderRadius: '4px', 
+                        flexGrow: 1,
+                        backgroundColor: mode === 'save' && selectedFile?.serverIp === server.ip && selectedFile?.path === currentPaths[server.ip]
+                          ? '#d1fae5'
+                          : 'transparent'
+                      }}
+                    >
+                      {currentPaths[server.ip]}
+                      {mode === 'save' && selectedFile?.serverIp === server.ip && selectedFile?.path === currentPaths[server.ip] && (
+                        <span style={{ marginLeft: '10px', color: '#047857', fontWeight: 'bold' }}>
+                          (Selected for saving)
+                        </span>
+                      )}
                     </div>
+                  </div>
 
-                    {/* Show file management options for import, save, select, and manage modes */}
-                    {(mode === 'import' || mode === 'save' || mode === 'select' || mode === 'manage') && (
-                      <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-                        {selectedItems.length === 0 && (
-                          <>
-                            <button
-                              onClick={() => openCreateFolderDialog(server.ip)}
-                              disabled={!activeServer || activeServer !== server.ip}
-                              style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
-                            >
-                              <Plus size={16} /> Folder
-                            </button>
-                            <button
-                              onClick={() => openCreateFileDialog(server.ip)}
-                              disabled={!activeServer || activeServer !== server.ip}
-                              style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
-                            >
-                              <PlusCircle size={16} /> File
-                            </button>
-                          </>
-                        )}
-                        <button
-                          onClick={handleCopy}
-                          disabled={(!selectedItems.length > 0 && !selectedFile && !selectedFolder) || activeServer !== server.ip}
-                          style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
-                        >
-                          <Copy size={16} /> Copy
-                        </button>
-                        {selectedItems.length === 0 && (
+                  {/* Show file management options for import, save, select, and manage modes */}
+                  {(mode === 'import' || mode === 'save' || mode === 'select' || mode === 'manage') && (
+                    <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                      {selectedItems.length === 0 && (
+                        <>
                           <button
-                            onClick={handlePaste}
-                            disabled={(!copiedItems?.length && !copiedItem) || activeServer !== server.ip}
+                            onClick={() => openCreateFolderDialog(server.ip)}
+                            disabled={!activeServer || activeServer !== server.ip}
                             style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
                           >
-                            <Clipboard size={16} /> Paste
+                            <Plus size={16} /> Folder
                           </button>
-                        )}
+                          <button
+                            onClick={() => openCreateFileDialog(server.ip)}
+                            disabled={!activeServer || activeServer !== server.ip}
+                            style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
+                          >
+                            <PlusCircle size={16} /> File
+                          </button>
+                        </>
+                      )}
+                      <button
+                        onClick={handleCopy}
+                        disabled={(!selectedItems.length > 0 && !selectedFile && !selectedFolder) || activeServer !== server.ip}
+                        style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
+                      >
+                        <Copy size={16} /> Copy
+                      </button>
+                      {selectedItems.length === 0 && (
                         <button
-                          onClick={handleDeleteFile}
-                          disabled={(!selectedItems.length > 0 && !selectedFile && !selectedFolder) || activeServer !== server.ip}
-                          style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', background: '#dc3545', color: 'white' }}
+                          onClick={handlePaste}
+                          disabled={(!copiedItems?.length && !copiedItem) || activeServer !== server.ip}
+                          style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
                         >
-                          <Trash size={16} /> Delete
+                          <Clipboard size={16} /> Paste
                         </button>
-                        {selectedItems.length === 0 && (
-                          <>
-                            <button
-                              onClick={handleRenameClick}
-                              disabled={(!selectedFile && !selectedFolder) || activeServer !== server.ip}
-                              style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
-                            >
-                              <Pencil size={16} /> Rename
-                            </button>
-                            <button
-                              onClick={handleEditClick}
-                              disabled={!selectedFile || selectedFolder || activeServer !== server.ip}
-                              style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
-                            >
-                              <Edit size={16} /> Edit
-                            </button>
-                            <input
-                              type="file"
-                              ref={fileInputRef}
-                              onChange={(event) => handleFileUpload(event, server.ip)}
-                              style={{ display: 'none' }}
-                            />
-                            <button
-                              onClick={handleUploadClick}
-                              disabled={!activeServer || activeServer !== server.ip}
-                              style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
-                            >
-                              <Upload size={16} /> Upload
-                            </button>
-                            <button
-                              onClick={() => fetchContents(server.ip, currentPaths[server.ip])}
-                              disabled={!activeServer || activeServer !== server.ip}
-                              style={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                gap: '5px', 
-                                padding: '6px 12px',
-                                backgroundColor: '#4CAF50',
-                                color: 'white'
-                              }}
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/>
-                              </svg>
-                              Refresh
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    )}
-
-                    {loading && activeServer === server.ip && <p>Loading...</p>}
-                    {fileContents[`${server.ip}:${currentPaths[server.ip]}`]?.map(item => {
-                      // Handle loading state
-                      if (item.type === 'loading') {
-                        return (
-                          <div key="loading" style={{ padding: '10px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <svg 
-                              xmlns="http://www.w3.org/2000/svg" 
-                              width="16" 
-                              height="16" 
-                              viewBox="0 0 24 24" 
-                              fill="none" 
-                              stroke="currentColor" 
-                              strokeWidth="2" 
-                              strokeLinecap="round" 
-                              strokeLinejoin="round"
-                              style={{ 
-                                animation: 'spin 1s linear infinite',
-                              }}
-                            >
-                              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                            </svg>
-                            <span>Loading directory contents...</span>
-                          </div>
-                        );
-                      }
-                      
-                      // Handle error state
-                      if (item.type === 'error') {
-                        return (
-                          <div key="error" style={{ padding: '10px 0', color: '#dc3545', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <circle cx="12" cy="12" r="10" />
-                              <line x1="12" y1="8" x2="12" y2="12" />
-                              <line x1="12" y1="16" x2="12.01" y2="16" />
-                            </svg>
-                            <span>{item.name}</span>
-                          </div>
-                        );
-                      }
-                      
-                      const isSelected = 
-                        (item.type === 'directory' && selectedFolder?.serverIp === server.ip && selectedFolder?.path === item.path) ||
-                        (item.type !== 'directory' && selectedFile?.serverIp === server.ip && selectedFile?.path === item.path);
-                        
-                        // Check if item is in the multi-select list
-                        const isMultiSelected = selectedItems.some(
-                          selectedItem => selectedItem.serverIp === server.ip && selectedItem.path === item.path
-                        );
-
-                        return (
-                          <div 
-                            key={item.path} 
-                            onClick={(event) => item.type === 'directory' ? handleFolderClick(server.ip, item.path, event) : handleFileClick(server.ip, item.path, event)}
-                            onDoubleClick={() => item.type === 'directory' ? handleFolderDoubleClick(server.ip, item.path) : null}
-                            style={{
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '8px',
-                              padding: '5px 0',
-                              fontWeight: (isSelected || isMultiSelected) ? 'bold' : 'normal',
-                              backgroundColor: isMultiSelected ? '#e3f2fd' : isSelected ? '#e2e8f0' : 'transparent',
-                              borderRadius: '4px',
-                              paddingLeft: '5px',
-                              border: isMultiSelected ? '1px solid #2196F3' : 'none'
+                      )}
+                      <button
+                        onClick={handleDeleteFile}
+                        disabled={(!selectedItems.length > 0 && !selectedFile && !selectedFolder) || activeServer !== server.ip}
+                        style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', background: '#dc3545', color: 'white' }}
+                      >
+                        <Trash size={16} /> Delete
+                      </button>
+                      {selectedItems.length === 0 && (
+                        <>
+                          <button
+                            onClick={handleRenameClick}
+                            disabled={(!selectedFile && !selectedFolder) || activeServer !== server.ip}
+                            style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
+                          >
+                            <Pencil size={16} /> Rename
+                          </button>
+                          <button
+                            onClick={handleEditClick}
+                            disabled={!selectedFile || selectedFolder || activeServer !== server.ip}
+                            style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
+                          >
+                            <Edit size={16} /> Edit
+                          </button>
+                          <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={(event) => handleFileUpload(event, server.ip)}
+                            style={{ display: 'none' }}
+                          />
+                          <button
+                            onClick={handleUploadClick}
+                            disabled={!activeServer || activeServer !== server.ip}
+                            style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px' }}
+                          >
+                            <Upload size={16} /> Upload
+                          </button>
+                          <button
+                            onClick={() => fetchContents(server.ip, currentPaths[server.ip])}
+                            disabled={!activeServer || activeServer !== server.ip}
+                            style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '5px', 
+                              padding: '6px 12px',
+                              backgroundColor: '#4CAF50',
+                              color: 'white'
                             }}
                           >
-                            {isMultiSelected && (
-                              <div style={{ 
-                                backgroundColor: '#2196F3', 
-                                borderRadius: '50%', 
-                                width: '16px', 
-                                height: '16px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                marginRight: '4px'
-                              }}>
-                                <Check size={12} color="white" />
-                              </div>
-                            )}
-                            {item.type === 'directory' ? <Folder size={16} /> : <File size={16} />}
-                            {item.name}
-                          </div>
-                        );
-                      })}
-                  </div>
-                )}
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/>
+                            </svg>
+                            Refresh
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {loading && activeServer === server.ip && <p>Loading...</p>}
+                  {fileContents[`${server.ip}:${currentPaths[server.ip]}`]?.map(item => {
+                    // Handle loading state
+                    if (item.type === 'loading') {
+                      return (
+                        <div key="loading" style={{ padding: '10px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <svg 
+                            xmlns="http://www.w3.org/2000/svg" 
+                            width="16" 
+                            height="16" 
+                            viewBox="0 0 24 24" 
+                            fill="none" 
+                            stroke="currentColor" 
+                            strokeWidth="2" 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round"
+                            style={{ 
+                              animation: 'spin 1s linear infinite',
+                            }}
+                          >
+                            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                          </svg>
+                          <span>Loading directory contents...</span>
+                        </div>
+                      );
+                    }
+                    
+                    // Handle error state
+                    if (item.type === 'error') {
+                      return (
+                        <div key="error" style={{ padding: '10px 0', color: '#dc3545', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="8" x2="12" y2="12" />
+                            <line x1="12" y1="16" x2="12.01" y2="16" />
+                          </svg>
+                          <span>{item.name}</span>
+                        </div>
+                      );
+                    }
+                    
+                    const isSelected = 
+                      (item.type === 'directory' && selectedFolder?.serverIp === server.ip && selectedFolder?.path === item.path) ||
+                      (item.type !== 'directory' && selectedFile?.serverIp === server.ip && selectedFile?.path === item.path);
+                      
+                      // Check if item is in the multi-select list
+                      const isMultiSelected = selectedItems.some(
+                        selectedItem => selectedItem.serverIp === server.ip && selectedItem.path === item.path
+                      );
+
+                      return (
+                        <div 
+                          key={item.path} 
+                          onClick={(event) => item.type === 'directory' ? handleFolderClick(server.ip, item.path, event) : handleFileClick(server.ip, item.path, event)}
+                          onDoubleClick={() => item.type === 'directory' ? handleFolderDoubleClick(server.ip, item.path) : null}
+                          style={{
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '5px 0',
+                            fontWeight: (isSelected || isMultiSelected) ? 'bold' : 'normal',
+                            backgroundColor: isMultiSelected ? '#e3f2fd' : isSelected ? '#e2e8f0' : 'transparent',
+                            borderRadius: '4px',
+                            paddingLeft: '5px',
+                            border: isMultiSelected ? '1px solid #2196F3' : 'none'
+                          }}
+                        >
+                          {isMultiSelected && (
+                            <div style={{ 
+                              backgroundColor: '#2196F3', 
+                              borderRadius: '50%', 
+                              width: '16px', 
+                              height: '16px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              marginRight: '4px'
+                            }}>
+                              <Check size={12} color="white" />
+                            </div>
+                          )}
+                          {item.type === 'directory' ? <Folder size={16} /> : <File size={16} />}
+                          {item.name}
+                        </div>
+                      );
+                    })}
+                </div>
               </div>
             ))
           )}
