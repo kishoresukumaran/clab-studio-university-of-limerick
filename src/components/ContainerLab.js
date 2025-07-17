@@ -1253,15 +1253,48 @@ const App = ({ user, parentSetMode }) => {
         // Check if the lab exists on this server (only if topology name is not empty)
         if (formattedTopologyName) {
           try {
-            const inspectResponse = await fetch(
-              `http://10.83.12.166:3002/api/containerlab/labs/inspect/${formattedTopologyName}?serverIp=${server.value}&username=${user?.username}`
-            );
+            // First, we need to login to get an auth token using the proxy
+            const loginResponse = await fetch(`/login`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              },
+              body: JSON.stringify({
+                username: user?.username,
+                password: 'arastra'
+              })
+            });
             
-            if (inspectResponse.ok) {
-              const inspectData = await inspectResponse.json();
-              labExists[server.value] = inspectData.exists;
-              console.log(`Lab existence check for ${formattedTopologyName} on ${server.value}: ${inspectData.exists}`);
+            if (loginResponse.ok) {
+              const loginData = await loginResponse.json();
+              const authToken = loginData.token;
+              
+              // Use the official containerlab API to check if the lab exists
+              const inspectResponse = await fetch(
+                `/api/v1/labs/${formattedTopologyName}`,
+                {
+                  headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                  }
+                }
+              );
+              
+              if (inspectResponse.status === 200) {
+                // If we get a 200 status, the lab exists
+                labExists[server.value] = true;
+              } else if (inspectResponse.status === 404) {
+                // If we get a 404 status, the lab doesn't exist
+                labExists[server.value] = false;
+              } else {
+                // Any other status, assume the lab doesn't exist
+                labExists[server.value] = false;
+              }
+              
+              console.log(`Lab existence check for ${formattedTopologyName} on ${server.value}: ${labExists[server.value]}`);
             } else {
+              console.error(`Could not login to check lab existence on ${server.value}`);
               labExists[server.value] = false;
             }
           } catch (error) {
@@ -1319,53 +1352,67 @@ const App = ({ user, parentSetMode }) => {
         ? topologyName 
         : `${user?.username || ''}-${topologyName}`;
       
-      // Construct the lab file path
-      const labFilePath = `/home/clab_nfs_share/containerlab_topologies/${user?.username}/${formattedTopologyName}/${formattedTopologyName}.yaml`;
-      
-      setOperationLogs(prev => prev + `\nUsing lab file path: ${labFilePath}\n`);
+      setOperationLogs(prev => prev + `\nReconfiguring lab: ${formattedTopologyName}\n`);
       setOperationLogs(prev => prev + `\nNote: Reconfiguration will only work if this topology has been previously deployed to this server.\n`);
       
-      // Create a file from the YAML content
-      const yamlBlob = new Blob([yamlOutput], { type: 'text/yaml' });
-      const fileName = formattedTopologyName + '.yaml';
-      const yamlFile = new File([yamlBlob], fileName, { type: 'text/yaml' });
-
-      // Create form data
-      const formData = new FormData();
-      formData.append('file', yamlFile);
-      formData.append('serverIp', serverIp);
-      formData.append('username', user?.username);
+      // Step 1: Login to get the authentication token
+      setOperationLogs(prev => prev + '\nLogging in to containerlab API...\n');
       
-      // Comment out the direct server backend call
-      // Make the reconfigure request with the file upload
-      const response = await fetch(`http://${serverIp}:3001/api/containerlab/reconfigure`, {
+      // Use relative URL to leverage the proxy setting in package.json
+      const loginResponse = await fetch(`/login`, {
         method: 'POST',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          username: user?.username,
+          password: 'arastra'
+        })
       });
 
-      // Use the dedicated reconfigure endpoint from the API handler
-      //setOperationLogs(prev => prev + `\nUsing official containerlab API for reconfiguration...\n`);
-      
-      // Make the API call to the containerlab API handler's reconfigure endpoint
-      // const response = await fetch(`http://10.83.12.166:3002/api/containerlab/labs/reconfigure`, {
-      //   method: 'POST',
-      //   body: formData
-      // });
-
-      if (!response.ok) {
-        throw new Error(`Server responded with ${response.status}`);
+      if (!loginResponse.ok) {
+        throw new Error(`Login failed: ${loginResponse.status} ${loginResponse.statusText}`);
       }
 
-      // Read the streaming response
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
+      const loginData = await loginResponse.json();
+      const authToken = loginData.token;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        
-        const text = decoder.decode(value);
-        setOperationLogs(prev => prev + text);
+      setOperationLogs(prev => prev + 'Successfully logged in to containerlab API\n');
+      setOperationLogs(prev => prev + '\nPreparing to reconfigure topology...\n');
+
+      // Step 2: Parse the YAML to a JSON object for the API
+      const topologyContentJson = yaml.load(yamlOutput);
+      
+      // Step 3: Send the topology to the containerlab API with reconfigure=true
+      const deployResponse = await fetch(`/api/v1/labs?reconfigure=true`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          topologyContent: topologyContentJson
+        })
+      });
+
+      if (!deployResponse.ok) {
+        const errorText = await deployResponse.text();
+        throw new Error(`Reconfiguration failed: ${deployResponse.status} - ${errorText}`);
+      }
+
+      // Process response
+      const contentType = deployResponse.headers.get('content-type');
+      
+      if (contentType && contentType.includes('application/json')) {
+        const deployData = await deployResponse.json();
+        setOperationLogs(prev => prev + '\nReconfiguration completed successfully!\n');
+        setOperationLogs(prev => prev + JSON.stringify(deployData, null, 2));
+      } else {
+        const deployText = await deployResponse.text();
+        setOperationLogs(prev => prev + '\nReconfiguration completed successfully!\n');
+        setOperationLogs(prev => prev + deployText);
       }
 
       setDeploymentSuccess(true);
@@ -1484,52 +1531,71 @@ const App = ({ user, parentSetMode }) => {
         }
       }
 
-      // Create a file from the YAML content - using the latest version with all updates
+      // Use the final YAML with all updates
       const finalYaml = yamlNeedsUpdate ? yaml.dump(parsedYaml, {
         lineWidth: -1,
         quotingType: '"',
         forceQuotes: true
       }) : yamlOutput;
 
-      const yamlBlob = new Blob([finalYaml], { type: 'text/yaml' });
-      const fileName = parsedYaml.name.includes(user?.username) 
-        ? `${parsedYaml.name}.yaml` 
-        : `${user?.username || ''}-${parsedYaml.name}.yaml`;
-      const yamlFile = new File([yamlBlob], fileName, { type: 'text/yaml' });
-
-      // Create form data. This is the data that is sent to the containerlab server to deploy the topology.
-      const formData = new FormData();
-      formData.append('file', yamlFile);
-      formData.append('serverIp', serverIp);
-      formData.append('username', user?.username);
-
-      //Now proceed with the deployment. This is the API call to deploy the topology to the containerlab server.
-      //this is using the old API handler. Custom script written by me.
-      const response = await fetch(`http://${serverIp}:3001/api/containerlab/deploy`, {
+      // Step 1: Login to get the authentication token
+      setOperationLogs(prev => prev + '\nLogging in to containerlab API...\n');
+      
+      // Use relative URL to leverage the proxy setting in package.json
+      const loginResponse = await fetch(`/login`, {
         method: 'POST',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          username: user?.username,
+          password: 'arastra'
+        })
       });
 
-      // // Now proceed with the deployment through our API handler that uses offical containerlab REST APIs
-      // const response = await fetch(`http://10.83.12.166:3002/api/containerlab/labs/deploy`, {
-      //   method: 'POST',
-      //   body: formData
-      // });
-
-      if (!response.ok) {
-        throw new Error(`Server responded with ${response.status}`);
+      if (!loginResponse.ok) {
+        throw new Error(`Login failed: ${loginResponse.status} ${loginResponse.statusText}`);
       }
 
-      // Read the streaming response. This is the response from the containerlab server to the deployment of the topology.
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
+      const loginData = await loginResponse.json();
+      const authToken = loginData.token;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        
-        const text = decoder.decode(value);
-        setOperationLogs(prev => prev + text);
+      setOperationLogs(prev => prev + 'Successfully logged in to containerlab API\n');
+      setOperationLogs(prev => prev + '\nPreparing to deploy topology...\n');
+
+      // Step 2: Parse the YAML to a JSON object for the API
+      const topologyContentJson = yaml.load(finalYaml);
+      
+      // Step 3: Send the topology to the containerlab API using relative URL
+      const deployResponse = await fetch(`/api/v1/labs`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          topologyContent: topologyContentJson
+        })
+      });
+
+      if (!deployResponse.ok) {
+        const errorText = await deployResponse.text();
+        throw new Error(`Deployment failed: ${deployResponse.status} - ${errorText}`);
+      }
+
+      // Process streaming response if available, otherwise handle JSON response
+      const contentType = deployResponse.headers.get('content-type');
+      
+      if (contentType && contentType.includes('application/json')) {
+        const deployData = await deployResponse.json();
+        setOperationLogs(prev => prev + '\nDeployment completed successfully!\n');
+        setOperationLogs(prev => prev + JSON.stringify(deployData, null, 2));
+      } else {
+        const deployText = await deployResponse.text();
+        setOperationLogs(prev => prev + '\nDeployment completed successfully!\n');
+        setOperationLogs(prev => prev + deployText);
       }
 
       setDeploymentSuccess(true);
