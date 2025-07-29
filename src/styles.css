@@ -29,12 +29,12 @@ h1 {
 }
 
 .node-panel {
-  /* width: 20%; */
+  width: 220px; /* Fixed width instead of percentage for better control */
   padding: 10px;
   background-color: #f9f9f9;
   border-right: 1px solid #ccc;
   overflow-y: auto;
-  min-width: 250px; /* Ensure enough width for labels */
+  min-width: 200px; /* Reduced min-width */
 }
 
 .node-panel div {
@@ -44,6 +44,9 @@ h1 {
 .node-panel label {
   display: block;
   margin-bottom: 5px;
+  color: #072452;
+  font-size: 16px;
+  font-weight: bold;
 }
 
 .node-panel input {
@@ -53,14 +56,14 @@ h1 {
 }
 
 .node-panel-act {
-  width: 20%;
+  width: 220px; /* Fixed width to match main node-panel */
   /* padding: 10px; */
   background-color: #f9f9f9;
   display: flex;
   flex-direction: column;
   height: 10%;
   overflow-y: auto;
-  min-width: 250px; /* Ensure enough width for labels */
+  min-width: 200px; /* Reduced min-width to match main node-panel */
 }
 
 .node-panel-act div {
@@ -79,11 +82,24 @@ h1 {
 }
 
 .node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   padding: 10px;
   margin-bottom: 10px;
   background-color: #f0f0f0;
   border: 1px solid #ccc;
   cursor: grab;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  text-align: center;
+  min-width: 60px;
+}
+
+.node:hover {
+  background-color: #e0e0e0;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .reactflow-wrapper {
@@ -109,7 +125,7 @@ h1 {
 }
 
 .yaml-output {
-  width: 20%;
+  width: 100%; /* Take full width of parent container */
   padding: 10px;
   background-color: #f9f9f9;
   border-left: 1px solid #ccc;
@@ -610,9 +626,12 @@ button.add-kind:hover {
 }
 
 .node-label {
-  font-size: 12px;
-  font-weight: bold;
+  font-size: 11px;
+  font-weight: 500;
   text-align: center;
+  margin-top: 4px;
+  color: #333;
+  line-height: 1.2;
 }
 
 .checkbox-group {
@@ -789,6 +808,7 @@ button[onClick*="handleAddKind"] {
   margin: 20px 0 15px 0;
   color: #072452;
   font-size: 16px;
+  font-weight: bold;
   /* border-bottom: 1px solid #ccc; */
   padding-bottom: 8px;
 }
@@ -1933,6 +1953,63 @@ button[type="submit"]:active {
   background-color: #1d4ed8;
 }
 
+/* YAML Actions Group in Sidebar */
+.yaml-actions-group {
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid #ddd;
+}
+
+.sidebar-action-button {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 10px;
+  background-color: #072452;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+  font-size: 14px;
+}
+
+.sidebar-action-button:hover {
+  background-color: #0a3270;
+}
+
+.sidebar-action-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+  opacity: 0.6;
+  color: #666666;
+}
+
+.sidebar-action-button:disabled:hover {
+  background-color: #cccccc;
+}
+
+/* Special styling for deploy button in sidebar */
+.sidebar-action-button.deploy-button {
+  background-color: #16a34a;
+  color: white;
+}
+
+.sidebar-action-button.deploy-button:hover {
+  background-color: #15803d;
+}
+
+.sidebar-action-button.deploy-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+  opacity: 0.6;
+  color: #666666;
+}
+
+.sidebar-action-button.deploy-button:disabled:hover {
+  background-color: #cccccc;
+}
+
 .bind-input-group {
   margin-bottom: 10px;
 }
@@ -2005,52 +2082,180 @@ button[type="submit"]:active {
   line-height: 1.5;
 }
 
-/* PrismJS token styles for darker highlighting */
-.yaml-output .editor-container .token.comment {
-  color: #6a9955; /* Green for comments */
+/* Line numbering styles */
+.yaml-output .editor-container-with-lines {
+  background-color: #f9f9f9;
+  color: #333;
+  display: flex;
+  flex-direction: row;
+  position: relative;
+  flex-grow: 1;
+  width: 100%; /* Ensure it takes full width */
 }
 
-.yaml-output .editor-container .token.property, .yaml-output .editor-container .token.tag, .yaml-output .editor-container .token.boolean, .yaml-output .editor-container .token.number, .yaml-output .editor-container .token.constant, .yaml-output .editor-container .token.symbol {
-  color: #072452; /* Blue */
+.yaml-output .line-numbers {
+  background-color: #f0f0f0;
+  border-right: 1px solid #ddd;
+  color: #666;
+  font-family: "Fira code", "Fira Mono", Consolas, "DejaVu Sans Mono", Monaco, "Andale Mono", "Ubuntu Mono", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 10px 2px 10px 3px;
+  text-align: right;
+  user-select: none;
+  min-width: 18px;
+  white-space: nowrap;
 }
 
-.yaml-output .editor-container .token.selector, .yaml-output .editor-container .token.attr-name, .yaml-output .editor-container .token.string, .yaml-output .editor-container .token.char, .yaml-output .editor-container .token.builtin, .yaml-output .editor-container .token.inserted {
-  color: #a31515; /* Reddish for strings */
+.yaml-output .line-number {
+  height: 18px; /* Match line-height * font-size */
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
 
-.yaml-output .editor-container .token.operator, .yaml-output .editor-container .token.entity, .yaml-output .editor-container .token.url, .yaml-output .editor-container .language-css .token.string, .yaml-output .editor-container .style .token.string {
-  color: #333; /* Default color */
+.yaml-output .editor-content {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
 }
 
-.yaml-output .editor-container .token.atrule, .yaml-output .editor-container .token.keyword {
-  color: #0000ff; /* Blue for keywords */
+.yaml-output .editor-content .Editor__textarea,
+.yaml-output .editor-content .Editor__editor {
+  font-family: "Fira code", "Fira Mono", Consolas, "DejaVu Sans Mono", Monaco, "Andale Mono", "Ubuntu Mono", monospace;
+  font-size: 12px;
+  padding: 10px 0 10px 12px !important;
+  margin: 0 !important;
+  outline: none;
+  border: none;
+  background-color: transparent;
+  color: inherit;
+  caret-color: #333;
+  line-height: 1.5;
+  resize: none;
 }
 
-.yaml-output .editor-container .token.function {
-  color: #795e26; /* Brown for functions */
+/* PrismJS token styles - Override prism-tomorrow.css theme for better readability */
+/* High specificity selectors to ensure our colors take precedence */
+
+/* YAML Keys (property names) - Dark Maroon */
+.yaml-output .token.property,
+.yaml-output .token.tag,
+.yaml-output .token.attr-name,
+.yaml-output .token.key,
+.yaml-output-container .token.property,
+.yaml-output-container .token.tag,
+.yaml-output-container .token.attr-name,
+.yaml-output-container .token.key {
+  color: #8B0000 !important; /* Dark maroon for keys */
+  font-weight: 600 !important; /* Bold for keys */
 }
 
-.yaml-output .editor-container .token.regex, .yaml-output .editor-container .token.variable {
-  color: #ff0000; /* Red */
+/* YAML Values (strings, numbers, booleans) - Dark Blue */
+.yaml-output .token.string,
+.yaml-output .token.number,
+.yaml-output .token.boolean,
+.yaml-output .token.constant,
+.yaml-output .token.scalar,
+.yaml-output-container .token.string,
+.yaml-output-container .token.number,
+.yaml-output-container .token.boolean,
+.yaml-output-container .token.constant,
+.yaml-output-container .token.scalar {
+  color: #1565C0 !important; /* Dark blue for values */
+  font-weight: 500 !important;
 }
 
-.yaml-output .editor-container .token.important,
-.yaml-output .editor-container .token.bold {
-  font-weight: bold;
+/* Comments - Darker Green */
+.yaml-output .token.comment,
+.yaml-output-container .token.comment {
+  color: #2E7D32 !important; /* Dark green for comments */
+  font-weight: 500 !important;
 }
 
-.yaml-output .editor-container .token.italic {
-  font-style: italic;
+/* Punctuation (colons, commas, brackets) - Dark Gray */
+.yaml-output .token.punctuation,
+.yaml-output .token.operator,
+.yaml-output-container .token.punctuation,
+.yaml-output-container .token.operator {
+  color: #424242 !important; /* Dark gray for punctuation */
+  font-weight: 500 !important;
 }
 
-.yaml-output .editor-container .token.deleted {
-  color: #ff0000; /* Red */
+/* Keywords - Darker Blue */
+.yaml-output .token.keyword,
+.yaml-output .token.atrule,
+.yaml-output-container .token.keyword,
+.yaml-output-container .token.atrule {
+  color: #0D47A1 !important; /* Darker blue for keywords */
+  font-weight: 600 !important;
 }
 
-/* Add more specific styles for YAML structure if needed */
-/* For example, keys can be colored differently */
-.yaml-output .editor-container .token.key.attr-name {
-  color: #000000; /* Black for keys */
+/* Other tokens */
+.yaml-output .token.selector,
+.yaml-output .token.char,
+.yaml-output .token.builtin,
+.yaml-output .token.inserted,
+.yaml-output-container .token.selector,
+.yaml-output-container .token.char,
+.yaml-output-container .token.builtin,
+.yaml-output-container .token.inserted {
+  color: #1565C0 !important; /* Blue for other value-like tokens */
+  font-weight: 500 !important;
+}
+
+.yaml-output .token.function,
+.yaml-output-container .token.function {
+  color: #6A1B9A !important; /* Dark purple for functions */
+  font-weight: 500 !important;
+}
+
+.yaml-output .token.regex,
+.yaml-output .token.variable,
+.yaml-output-container .token.regex,
+.yaml-output-container .token.variable {
+  color: #C62828 !important; /* Dark red for variables */
+  font-weight: 500 !important;
+}
+
+.yaml-output .token.important,
+.yaml-output .token.bold,
+.yaml-output-container .token.important,
+.yaml-output-container .token.bold {
+  font-weight: bold !important;
+  color: #8B0000 !important;
+}
+
+.yaml-output .token.italic,
+.yaml-output-container .token.italic {
+  font-style: italic !important;
+}
+
+.yaml-output .token.deleted,
+.yaml-output-container .token.deleted {
+  color: #C62828 !important;
+  font-weight: 500 !important;
+}
+
+/* Ensure react-simple-code-editor tokens are also styled */
+.yaml-output [class*="token"],
+.yaml-output-container [class*="token"] {
+  font-weight: 500;
+}
+
+/* Additional fallback for any remaining unstyled tokens */
+.yaml-output span[class*="property"],
+.yaml-output span[class*="attr-name"],
+.yaml-output span[class*="tag"] {
+  color: #8B0000 !important;
+  font-weight: 600 !important;
+}
+
+.yaml-output span[class*="string"],
+.yaml-output span[class*="number"],
+.yaml-output span[class*="boolean"] {
+  color: #1565C0 !important;
+  font-weight: 500 !important;
 }
 
 /* Style for message when no topologies are deployed */
@@ -2190,19 +2395,22 @@ button[type="submit"]:active {
 }
 
 .node-buttons {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
   padding: 10px;
 }
 
 .node-icon {
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   transition: transform 0.2s ease;
+  color: #4a5568;
 }
 
-.node-icon:hover {
+.node:hover .node-icon {
   transform: scale(1.1);
+  color: #2d3748;
 }
 
 /* Centered modal overlay for create/rename dialogs */
@@ -2506,4 +2714,434 @@ button[type="submit"]:active {
   padding: 20px;
   background-color: white;
   border-radius: 5px;
+}
+
+/* Annotation Toolbar Styles */
+.annotation-toolbar {
+  position: absolute;
+  bottom: 20px;
+  right: 10px;
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  padding: 6px;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  z-index: 2000;
+}
+
+.tool-group {
+  display: flex;
+  flex-direction: row;
+  gap: 3px;
+  position: relative;
+}
+
+.tool-button {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: #f8f9fa;
+  color: #495057;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.tool-button:hover {
+  background: #e9ecef;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.tool-button.active {
+  background: #072452;
+  color: white;
+  box-shadow: 0 2px 8px rgba(7, 36, 82, 0.3);
+}
+
+.color-button {
+  border: 2px solid #dee2e6;
+  position: relative;
+}
+
+.color-button:hover {
+  border-color: #adb5bd;
+}
+
+.delete-button {
+  background: #dc3545;
+  color: white;
+}
+
+.delete-button:hover {
+  background: #c82333;
+}
+
+.style-button {
+  background: #6c757d;
+  color: white;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.style-button:hover {
+  background: #5a6268;
+}
+
+/* Dropdown Styles */
+.color-picker-dropdown,
+.text-options-dropdown,
+.shape-options-dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 8px;
+  background: white;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  min-width: 200px;
+  z-index: 2001;
+}
+
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+
+.color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  transition: transform 0.1s ease;
+}
+
+.color-swatch:hover {
+  transform: scale(1.1);
+}
+
+.option-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.option-row:last-child {
+  margin-bottom: 0;
+}
+
+.option-row label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #495057;
+  min-width: 60px;
+  margin: 0;
+}
+
+.option-row input[type="range"] {
+  flex: 1;
+  margin: 0;
+}
+
+.option-row span {
+  font-size: 11px;
+  color: #6c757d;
+  min-width: 30px;
+  text-align: right;
+}
+
+.style-toggle {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  background: #f8f9fa;
+  color: #495057;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.style-toggle:hover {
+  background: #e9ecef;
+  border-color: #adb5bd;
+}
+
+.style-toggle.active {
+  background: #072452;
+  color: white;
+  border-color: #072452;
+}
+
+/* Annotation Selection Styles */
+.selected-annotation {
+  filter: drop-shadow(0 0 4px #072452) drop-shadow(0 0 8px rgba(7, 36, 82, 0.5));
+  stroke-dasharray: 5,5;
+  animation: dash 1s linear infinite;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+
+/* Annotation interaction improvements */
+.annotation-element {
+  transition: opacity 0.2s ease;
+}
+
+.annotation-element:hover {
+  opacity: 0.8;
+}
+
+.annotation-element.selected-annotation {
+  opacity: 1;
+}
+
+/* Improve cursor feedback */
+.reactflow-wrapper[data-annotation-tool="rectangle"] {
+  cursor: crosshair;
+}
+
+.reactflow-wrapper[data-annotation-tool="text"] {
+  cursor: text;
+}
+
+.reactflow-wrapper[data-annotation-tool="circle"] {
+  cursor: crosshair;
+}
+
+.reactflow-wrapper[data-annotation-tool="select"] {
+  cursor: default;
+}
+
+/* Annotation Layer */
+.annotation-layer {
+  pointer-events: none;
+  user-select: none;
+}
+
+.annotation-layer text,
+.annotation-layer rect,
+.annotation-layer circle,
+.annotation-layer line,
+.annotation-layer g {
+  pointer-events: all;
+}
+
+/* Responsive adjustments for annotation toolbar */
+@media (max-width: 768px) {
+  .annotation-toolbar {
+    bottom: 60px;
+    right: 10px;
+    flex-wrap: wrap;
+    max-width: calc(100vw - 20px);
+  }
+  
+  .tool-button {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .color-picker-dropdown,
+  .text-options-dropdown,
+  .shape-options-dropdown {
+    min-width: 180px;
+    right: 0;
+    left: auto;
+  }
+}
+
+/* YAML Editor Collapsible Container Styles with Smooth Animation */
+.yaml-output-container {
+  position: relative;
+  display: flex;
+  width: 25%; /* Further reduced for more design space */
+  min-width: 320px; /* Reduced min-width for more flexibility */
+  max-width: 420px; /* Reduced max-width */
+  /* Enhanced transition for smooth animation */
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  background-color: #f9f9f9;
+  border-left: 1px solid #ccc;
+  overflow: visible; /* Allow toggle button to be visible outside container */
+}
+
+.yaml-output-container.collapsed {
+  width: 40px !important; /* Width when collapsed - just enough for the toggle button */
+  min-width: 40px !important; /* Override the min-width when collapsed */
+  max-width: 40px !important; /* Override the max-width when collapsed */
+}
+
+.yaml-toggle-button {
+  position: absolute;
+  left: -30px; /* Position outside the container */
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 15; /* Higher z-index to ensure visibility */
+  /* Ensure button stays visible during animation */
+  pointer-events: auto;
+  width: 30px;
+  height: 50px;
+  background-color: #072452;
+  color: white;
+  /* Smooth transition for button changes */
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: none;
+  border-radius: 8px 0 0 8px; /* Rounded on the left side like a tab */
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease-in-out;
+  box-shadow: -2px 0 4px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.yaml-toggle-button:hover {
+  background-color: #0a3270;
+  width: 32px;
+  transform: translateY(-50%) translateX(-2px); /* Slight leftward movement on hover */
+  box-shadow: -3px 0 6px rgba(0, 0, 0, 0.15), 0 3px 6px rgba(0, 0, 0, 0.1);
+}
+
+.yaml-toggle-button:active {
+  transform: translateY(-50%) translateX(-1px);
+}
+
+.yaml-output-container .yaml-output {
+  opacity: 1;
+  transform: translateX(0);
+  overflow: hidden; /* Hide content overflow during animation */
+  /* Enhanced transition for content */
+  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
+              transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  /* No margin needed - button is now outside the container */
+}
+
+.yaml-output-container.collapsed .yaml-output {
+  opacity: 0;
+  transform: translateX(20px); /* Slide content slightly right when hiding */
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* Responsive behavior with smooth animations maintained */
+@media (max-width: 1400px) {
+  .yaml-output-container {
+    width: 35%; /* Reduced from 40% */
+    min-width: 350px; /* Reduced from 400px */
+    max-width: 450px; /* Reduced from 550px */
+  }
+  
+  .yaml-output-container.collapsed {
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+  }
+}
+
+@media (max-width: 1200px) {
+  .yaml-output-container {
+    width: 350px; /* Reduced from 400px for medium screens */
+    min-width: unset;
+    max-width: unset;
+  }
+  
+  .yaml-output-container.collapsed {
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+  }
+}
+
+@media (max-width: 992px) {
+  .yaml-output-container {
+    width: 320px; /* Reduced from 350px for smaller screens */
+  }
+  
+  .yaml-output-container.collapsed {
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+  }
+  
+  .yaml-toggle-button {
+    width: 28px;
+    height: 45px;
+  }
+}
+
+@media (max-width: 768px) {
+  .yaml-output-container {
+    width: 100%;
+    position: fixed;
+    right: 0;
+    top: 0;
+    height: 100vh;
+    z-index: 1000;
+    transform: translateX(100%);
+    /* Enhanced transition for mobile sliding animation */
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .yaml-output-container.expanded {
+    transform: translateX(0);
+  }
+  
+  .yaml-output-container.collapsed {
+    width: 40px !important;
+    transform: translateX(calc(100% - 40px));
+  }
+  
+  .yaml-toggle-button {
+    left: -30px;
+    border-radius: 8px 0 0 8px;
+    box-shadow: -2px 0 4px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* Ensure the main layout adjusts when YAML editor is collapsed */
+.dndflow {
+  transition: all 0.3s ease-in-out;
+}
+
+/* Adjust ReactFlow wrapper when YAML editor is collapsed */
+.dndflow .reactflow-wrapper {
+  flex-grow: 1;
+  transition: all 0.3s ease-in-out;
+}
+
+/* Enhanced visual feedback for the toggle button with smooth rotation */
+.yaml-toggle-button svg {
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+}
+
+.yaml-output-container.collapsed .yaml-toggle-button svg {
+  transform: rotate(180deg);
+}
+
+/* Smooth animation for content visibility */
+.yaml-output-container .yaml-output * {
+  transition: opacity 0.3s ease-in-out;
+}
+
+.yaml-output-container.collapsed .yaml-output * {
+  opacity: 0;
 }

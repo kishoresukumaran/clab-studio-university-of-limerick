@@ -37,7 +37,22 @@ export const TopologyProvider = ({ children }) => {
     defaultKind: '',
     nodeInterfaces: {},
     isYamlValid: true,
-    yamlParseError: ''
+    yamlParseError: '',
+    // Annotation states
+    annotations: [],
+    activeTool: 'select',
+    selectedAnnotation: null,
+    annotationColor: '#FF6B6B',
+    textStyle: {
+      fontSize: 16,
+      bold: false,
+      italic: false,
+      underline: false
+    },
+    shapeStyle: {
+      strokeWidth: 2,
+      fillOpacity: 0.3
+    }
   });
 
   // Function to update the topology state

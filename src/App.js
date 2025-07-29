@@ -67,12 +67,12 @@ const MainApp = ({ user, onLogout }) => {
           >
             Dashboard
           </button>
-          <button
+          {/* <button
             className={`header-button ${mode === 'act' ? 'active' : ''}`}
             onClick={() => setMode('act')}
           >
             ACT (BETA)
-          </button>
+          </button> */}
         </div>
         <div className="header-logo-center">
           <img src={logo} alt="Containerlab Studio Logo" className="header-logo" />

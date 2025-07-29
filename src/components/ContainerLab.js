@@ -25,9 +25,10 @@ import Sidebar from "../Sidebar";
 import { saveAs } from "file-saver";
 import "../styles.css";
 import ELK from 'elkjs/lib/elk.bundled.js';
-import { Server, Loader2 } from "lucide-react";
+import { Server, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import LogModal from './LogModal';
 import FileManagerModal from './FileManagerModal';
+import AnnotationToolbar from './AnnotationToolbar';
 import { useTopology } from '../contexts/TopologyContext';
 
 import Editor from 'react-simple-code-editor';
@@ -309,6 +310,63 @@ const App = ({ user, parentSetMode }) => {
   const [modalType, setModalType] = useState("create");
   const [nodeIpv6MgmtIp, setNodeIpv6MgmtIp] = useState("");
 
+  // Add state for YAML editor toggle
+  const [isYamlEditorCollapsed, setIsYamlEditorCollapsed] = useState(() => {
+    // Load from localStorage if available, default to true (collapsed)
+    const saved = localStorage.getItem('yamlEditorCollapsed');
+    return saved ? JSON.parse(saved) : true;
+  });
+
+  // Get annotation states from context
+  const {
+    annotations,
+    activeTool,
+    selectedAnnotation,
+    annotationColor,
+    textStyle,
+    shapeStyle
+  } = topologyState;
+
+  // Helper functions to update annotation states in context
+  const setAnnotations = (newAnnotations) => {
+    const annotations = typeof newAnnotations === 'function' 
+      ? newAnnotations(topologyState.annotations) 
+      : newAnnotations;
+    updateTopologyState({ annotations });
+  };
+
+  const setActiveTool = (newTool) => {
+    updateTopologyState({ activeTool: newTool });
+  };
+
+  const setSelectedAnnotation = (newSelected) => {
+    updateTopologyState({ selectedAnnotation: newSelected });
+  };
+
+  const setAnnotationColor = (newColor) => {
+    updateTopologyState({ annotationColor: newColor });
+  };
+
+  const setTextStyle = (newStyle) => {
+    const textStyle = typeof newStyle === 'function' 
+      ? newStyle(topologyState.textStyle) 
+      : newStyle;
+    updateTopologyState({ textStyle });
+  };
+
+  const setShapeStyle = (newStyle) => {
+    const shapeStyle = typeof newStyle === 'function' 
+      ? newStyle(topologyState.shapeStyle) 
+      : newStyle;
+    updateTopologyState({ shapeStyle });
+  };
+  
+  // Annotation interaction states (these can remain local as they're temporary UI states)
+  const [isDraggingAnnotation, setIsDraggingAnnotation] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeHandle, setResizeHandle] = useState(null);
+
   const nodeTypes = React.useMemo(() => ({ svgNode: CustomNode }), []);
   const edgeTypes = React.useMemo(() => ({ custom: CustomEdge }), []);
 
@@ -533,6 +591,66 @@ const App = ({ user, parentSetMode }) => {
       updateYaml(updatedNodes, updatedEdges);
     },
     [nodes, edges]
+  );
+
+  /* This is the function to handle clicking on node buttons in the sidebar. It creates a node at the center of the canvas. */
+  const onNodeClick = useCallback(
+    (nodeType) => {
+      // Check if management settings are valid when required
+      if (showMgmt && !validateMgmtSettings()) {
+        return;
+      }
+
+      if (!topologyName.trim()) {
+        const newName = generateRandomName();
+        setTopologyName(newName);
+        // Update the YAML with the new name
+        const updatedYaml = yamlOutput.replace(/name:.*/, `name: ${newName}`);
+        setYamlOutput(updatedYaml);
+      }
+
+      // Create node at center of canvas (approximate center position)
+      const position = {
+        x: 400, // Default center-ish position
+        y: 200,
+      };
+
+      const newNode = {
+        id: getId(),
+        position,
+        data: { label: `${nodeType} node`, nodeType: nodeType }
+      };
+
+      setNewNode(newNode);
+      setIsModalOpen(true);
+      setModalType("create"); // Set to create mode
+      
+      // Set default values based on node type
+      if (nodeType === 'router') {
+        setNodeNamePrefix('ceos');
+        setNodeKind('ceos');
+        setNodeImage('ceos:4.34.0F');
+      } else if (nodeType === 'bridge') {
+        setNodeNamePrefix('bridge');
+        setNodeKind('linux');
+        setNodeImage('alpine');
+      } else if (nodeType === 'linux-host') {
+        setNodeNamePrefix('linux');
+        setNodeKind('linux');
+        setNodeImage('alpine');
+      } else if (nodeType === 'container') {
+        setNodeNamePrefix('container');
+        setNodeKind('linux');
+        setNodeImage('alpine');
+      }
+      
+      setNodeCount(1);
+      setNodeBinds([""]);
+      setNodeMgmtIp("");
+      setNodeModalWarning(false);
+      setNodeCustomFields([{ key: '', value: '' }]);
+    },
+    [yamlOutput, showMgmt, validateMgmtSettings, topologyName]
   );
 
   /* This is the function to update the YAML output of the topology. It is used to update the YAML output of the topology when a node or an edge is added or removed. */
@@ -1384,38 +1502,57 @@ const App = ({ user, parentSetMode }) => {
       // Step 2: Parse the YAML to a JSON object for the API
       const topologyContentJson = yaml.load(yamlOutput);
       
-      // Step 3: Send the topology to the containerlab API with reconfigure=true
-      const deployResponse = await fetch(`/api/v1/labs?reconfigure=true`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: JSON.stringify({
-          topologyContent: topologyContentJson
-        })
-      });
-
-      if (!deployResponse.ok) {
-        const errorText = await deployResponse.text();
-        throw new Error(`Reconfiguration failed: ${deployResponse.status} - ${errorText}`);
-      }
-
-      // Process response
-      const contentType = deployResponse.headers.get('content-type');
+      // Start a progress indicator to show reconfiguration is ongoing
+      setOperationLogs(prev => prev + '\nReconfiguration in progress. This might take a few minutes...\n');
       
-      if (contentType && contentType.includes('application/json')) {
-        const deployData = await deployResponse.json();
-        setOperationLogs(prev => prev + '\nReconfiguration completed successfully!\n');
-        setOperationLogs(prev => prev + JSON.stringify(deployData, null, 2));
-      } else {
-        const deployText = await deployResponse.text();
-        setOperationLogs(prev => prev + '\nReconfiguration completed successfully!\n');
-        setOperationLogs(prev => prev + deployText);
+      // Set up a progress indicator that updates every 5 seconds
+      const progressInterval = setInterval(() => {
+        setOperationLogs(prev => prev + '• Still working on reconfiguration, please wait...\n');
+      }, 5000);
+      
+      try {
+        // Step 3: Send the topology to the containerlab API with reconfigure=true
+        const deployResponse = await fetch(`/api/v1/labs?reconfigure=true`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            topologyContent: topologyContentJson
+          })
+        });
+        
+        // Clear the progress indicator once we get a response
+        clearInterval(progressInterval);
+        
+        if (!deployResponse.ok) {
+          const errorText = await deployResponse.text();
+          throw new Error(`Reconfiguration failed: ${deployResponse.status} - ${errorText}`);
+        }
+        
+        // Process the response here inside the try block
+        const contentType = deployResponse.headers.get('content-type');
+        let responseData;
+        
+        if (contentType && contentType.includes('application/json')) {
+          responseData = await deployResponse.json();
+          setOperationLogs(prev => prev + '\nReconfiguration completed successfully!\n');
+          setOperationLogs(prev => prev + JSON.stringify(responseData, null, 2));
+        } else {
+          responseData = await deployResponse.text();
+          setOperationLogs(prev => prev + '\nReconfiguration completed successfully!\n');
+          setOperationLogs(prev => prev + responseData);
+        }
+        
+        setDeploymentSuccess(true);
+        return;
+      } catch (error) {
+        // Make sure to clear the interval if there's an error
+        clearInterval(progressInterval);
+        throw error;
       }
-
-      setDeploymentSuccess(true);
     } catch (error) {
       console.error('Error reconfiguring topology:', error);
       setOperationLogs(prev => prev + `\nError: ${error.message}`);
@@ -1567,38 +1704,57 @@ const App = ({ user, parentSetMode }) => {
       // Step 2: Parse the YAML to a JSON object for the API
       const topologyContentJson = yaml.load(finalYaml);
       
-      // Step 3: Send the topology to the containerlab API using relative URL
-      const deployResponse = await fetch(`/api/v1/labs`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: JSON.stringify({
-          topologyContent: topologyContentJson
-        })
-      });
-
-      if (!deployResponse.ok) {
-        const errorText = await deployResponse.text();
-        throw new Error(`Deployment failed: ${deployResponse.status} - ${errorText}`);
-      }
-
-      // Process streaming response if available, otherwise handle JSON response
-      const contentType = deployResponse.headers.get('content-type');
+      // Start a progress indicator to show deployment is ongoing
+      setOperationLogs(prev => prev + '\nDeployment in progress. This might take a few minutes...\n');
       
-      if (contentType && contentType.includes('application/json')) {
-        const deployData = await deployResponse.json();
-        setOperationLogs(prev => prev + '\nDeployment completed successfully!\n');
-        setOperationLogs(prev => prev + JSON.stringify(deployData, null, 2));
-      } else {
-        const deployText = await deployResponse.text();
-        setOperationLogs(prev => prev + '\nDeployment completed successfully!\n');
-        setOperationLogs(prev => prev + deployText);
-      }
-
-      setDeploymentSuccess(true);
+      // Set up a progress indicator that updates every 5 seconds
+      const progressInterval = setInterval(() => {
+        setOperationLogs(prev => prev + '• Still working on deployment, please wait...\n');
+      }, 5000);
+      
+      try {
+        // Step 3: Send the topology to the containerlab API using relative URL
+        const deployResponse = await fetch(`/api/v1/labs`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            topologyContent: topologyContentJson
+          })
+        });
+        
+        // Clear the progress indicator once we get a response
+        clearInterval(progressInterval);
+        
+        if (!deployResponse.ok) {
+          const errorText = await deployResponse.text();
+          throw new Error(`Deployment failed: ${deployResponse.status} - ${errorText}`);
+        }
+        
+        // Process the response here inside the try block
+        const contentType = deployResponse.headers.get('content-type');
+        let responseData;
+        
+        if (contentType && contentType.includes('application/json')) {
+          responseData = await deployResponse.json();
+          setOperationLogs(prev => prev + '\nDeployment completed successfully!\n');
+          setOperationLogs(prev => prev + JSON.stringify(responseData, null, 2));
+        } else {
+          responseData = await deployResponse.text();
+          setOperationLogs(prev => prev + '\nDeployment completed successfully!\n');
+          setOperationLogs(prev => prev + responseData);
+        }
+        
+        setDeploymentSuccess(true);
+        return;
+      } catch (error) {
+        // Make sure to clear the interval if there's an error
+        clearInterval(progressInterval);
+        throw error;
+              }
     } catch (error) {
       console.error('Error deploying topology:', error);
       setOperationLogs(prev => prev + `\nError: ${error.message}`);
@@ -1719,7 +1875,22 @@ const App = ({ user, parentSetMode }) => {
       defaultKind: '',
       nodeInterfaces: {},
       isYamlValid: true,
-      yamlParseError: ''
+      yamlParseError: '',
+      // Reset annotation states
+      annotations: [],
+      activeTool: 'select',
+      selectedAnnotation: null,
+      annotationColor: '#FF6B6B',
+      textStyle: {
+        fontSize: 16,
+        bold: false,
+        italic: false,
+        underline: false
+      },
+      shapeStyle: {
+        strokeWidth: 2,
+        fillOpacity: 0.3
+      }
     });
   };
 
@@ -2567,6 +2738,228 @@ const App = ({ user, parentSetMode }) => {
   /* This is the function to check if a connection is valid. It is used to validate connections between nodes. */
   const isValidConnection = () => true;
 
+  /* Annotation Functions */
+  const generateAnnotationId = () => `annotation_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  const handleAnnotationSelect = useCallback((annotation, event) => {
+    if (event) {
+      event.stopPropagation();
+    }
+    setSelectedAnnotation(annotation);
+    setActiveTool('select');
+  }, []);
+
+  const handleAnnotationMouseMove = useCallback((event) => {
+    if (!isDraggingAnnotation || !selectedAnnotation) return;
+    
+    event.preventDefault();
+    
+    const rect = event.currentTarget.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    
+    const newX = mouseX - dragOffset.x;
+    const newY = mouseY - dragOffset.y;
+    
+    setAnnotations(prev => prev.map(ann => {
+      if (ann.id === selectedAnnotation.id) {
+        if (ann.type === 'text' || ann.type === 'circle') {
+          return { ...ann, x: newX, y: newY };
+        } else if (ann.type === 'rectangle') {
+          const width = Math.abs(ann.endX - ann.startX);
+          const height = Math.abs(ann.endY - ann.startY);
+          return { 
+            ...ann, 
+            startX: newX, 
+            startY: newY,
+            endX: newX + width,
+            endY: newY + height
+          };
+        } else if (ann.type === 'line' || ann.type === 'arrow') {
+          const deltaX = ann.endX - ann.startX;
+          const deltaY = ann.endY - ann.startY;
+          return { 
+            ...ann, 
+            startX: newX, 
+            startY: newY,
+            endX: newX + deltaX,
+            endY: newY + deltaY
+          };
+        }
+      }
+      return ann;
+    }));
+  }, [isDraggingAnnotation, selectedAnnotation, dragOffset]);
+
+  const handleAnnotationMouseUp = useCallback(() => {
+    setIsDraggingAnnotation(false);
+    setDragOffset({ x: 0, y: 0 });
+  }, []);
+
+  const handleAnnotationMouseDown = useCallback((annotation, event) => {
+    event.stopPropagation();
+    event.preventDefault();
+    
+    if (activeTool !== 'select') return;
+    
+    const rect = event.currentTarget.closest('.reactflow-wrapper').getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    
+    // Calculate drag offset
+    let offsetX = 0, offsetY = 0;
+    if (annotation.type === 'text' || annotation.type === 'circle') {
+      offsetX = mouseX - annotation.x;
+      offsetY = mouseY - annotation.y;
+    } else if (annotation.type === 'rectangle') {
+      const x = Math.min(annotation.startX, annotation.endX);
+      const y = Math.min(annotation.startY, annotation.endY);
+      offsetX = mouseX - x;
+      offsetY = mouseY - y;
+    } else if (annotation.type === 'line' || annotation.type === 'arrow') {
+      offsetX = mouseX - annotation.startX;
+      offsetY = mouseY - annotation.startY;
+    }
+    
+    setDragOffset({ x: offsetX, y: offsetY });
+    setIsDraggingAnnotation(true);
+    setSelectedAnnotation(annotation);
+  }, [activeTool]);
+
+  const handleDeleteSelected = useCallback(() => {
+    if (selectedAnnotation) {
+      setAnnotations(prev => prev.filter(a => a.id !== selectedAnnotation.id));
+      setSelectedAnnotation(null);
+    }
+  }, [selectedAnnotation]);
+
+  const handleCanvasClick = useCallback((event) => {
+    // Prevent if clicking on ReactFlow elements
+    if (event.target.closest('.react-flow__node') || event.target.closest('.react-flow__edge')) {
+      return;
+    }
+    
+    if (activeTool === 'select') return;
+
+    event.stopPropagation();
+    
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    if (activeTool === 'text') {
+      const text = prompt('Enter text:');
+      if (text) {
+        const newAnnotation = {
+          id: generateAnnotationId(),
+          type: 'text',
+          x,
+          y,
+          text,
+          color: annotationColor,
+          style: textStyle
+        };
+        setAnnotations(prev => [...prev, newAnnotation]);
+      }
+    } else if (activeTool === 'circle') {
+      const newAnnotation = {
+        id: generateAnnotationId(),
+        type: 'circle',
+        x,
+        y,
+        radius: 30,
+        color: annotationColor,
+        style: shapeStyle
+      };
+      setAnnotations(prev => [...prev, newAnnotation]);
+    } else if (activeTool === 'rectangle') {
+      const newAnnotation = {
+        id: generateAnnotationId(),
+        type: 'rectangle',
+        startX: x - 40,
+        startY: y - 25,
+        endX: x + 40,
+        endY: y + 25,
+        color: annotationColor,
+        style: shapeStyle
+      };
+      setAnnotations(prev => [...prev, newAnnotation]);
+    }
+  }, [activeTool, annotationColor, textStyle, shapeStyle]);
+
+  const handleCanvasMouseDown = useCallback((event) => {
+    // Prevent if clicking on ReactFlow elements
+    if (event.target.closest('.react-flow__node') || event.target.closest('.react-flow__edge')) {
+      return;
+    }
+
+    // Check if clicking on an annotation for selection/moving
+    if (event.target.closest('.annotation-element')) {
+      return; // Let annotation handle its own events
+    }
+
+    // No drawing tools need mouse down now since rectangle is click-to-create
+    return;
+  }, [activeTool]);
+
+  const handleCanvasMouseMove = useCallback((event) => {
+    // Handle annotation resizing
+    if (isResizing && selectedAnnotation && resizeHandle === 'radius') {
+      const rect = event.currentTarget.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
+      
+      const newRadius = Math.sqrt(
+        Math.pow(mouseX - selectedAnnotation.x, 2) + 
+        Math.pow(mouseY - selectedAnnotation.y, 2)
+      );
+      
+      setAnnotations(prev => prev.map(ann => 
+        ann.id === selectedAnnotation.id 
+          ? { ...ann, radius: Math.max(10, newRadius) } // Minimum radius of 10
+          : ann
+      ));
+    } else if (isResizing && selectedAnnotation && resizeHandle === 'rectangle') {
+      const rect = event.currentTarget.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
+      
+      // Update rectangle size by changing the endX and endY coordinates
+      setAnnotations(prev => prev.map(ann => {
+        if (ann.id === selectedAnnotation.id) {
+          // Ensure minimum size of 20x20
+          const newEndX = Math.max(ann.startX + 20, mouseX);
+          const newEndY = Math.max(ann.startY + 20, mouseY);
+          return { 
+            ...ann, 
+            endX: newEndX,
+            endY: newEndY
+          };
+        }
+        return ann;
+      }));
+    }
+
+    // Handle moving annotations
+    handleAnnotationMouseMove(event);
+  }, [isResizing, selectedAnnotation, resizeHandle, handleAnnotationMouseMove]);
+
+  const handleCanvasMouseUp = useCallback(() => {
+    setIsResizing(false);
+    setResizeHandle(null);
+    handleAnnotationMouseUp();
+  }, [handleAnnotationMouseUp]);
+
+  // YAML Editor Toggle Functions
+  const handleToggleYamlEditor = () => {
+    setIsYamlEditorCollapsed(!isYamlEditorCollapsed);
+  };
+
+  // Save YAML editor collapsed state to localStorage
+  useEffect(() => {
+    localStorage.setItem('yamlEditorCollapsed', JSON.stringify(isYamlEditorCollapsed));
+  }, [isYamlEditorCollapsed]);
+
   // Sync state changes with context
   useEffect(() => {
     updateTopologyState({
@@ -2608,6 +3001,24 @@ const App = ({ user, parentSetMode }) => {
     yamlParseError
   ]);
 
+  // Keyboard event handlers for annotations
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        if (selectedAnnotation && event.target.tagName !== 'INPUT' && event.target.tagName !== 'TEXTAREA') {
+          event.preventDefault();
+          handleDeleteSelected();
+        }
+      } else if (event.key === 'Escape') {
+        setSelectedAnnotation(null);
+        setActiveTool('select');
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [selectedAnnotation, handleDeleteSelected]);
+
   return (
     // This is the main container for the topology designer. It is the container that contains HTML elements for the topology designer.
     <ReactFlowProvider>
@@ -2616,7 +3027,6 @@ const App = ({ user, parentSetMode }) => {
           {mode === 'containerlab' ? (
             <>
               <div className="node-panel">
-                <Sidebar />
                 <div className="input-group">
                   <label>Name of the topology:</label>
                   <input
@@ -2625,6 +3035,7 @@ const App = ({ user, parentSetMode }) => {
                     onChange={handleTopologyNameChange}
                   />
                 </div>
+                <Sidebar onNodeClick={onNodeClick} />
 
                 <h3 
                   className="settings-heading" 
@@ -2637,7 +3048,7 @@ const App = ({ user, parentSetMode }) => {
                     userSelect: 'none'
                   }}
                 >
-                  {showGlobalSettings ? '▼' : '▶'} Global Settings (Optional)
+                  {showGlobalSettings ? '▼' : '▶'} Optional Settings
                   <span className="info-icon">ⓘ</span>
                 </h3>
 
@@ -2820,18 +3231,39 @@ const App = ({ user, parentSetMode }) => {
                 )}
 
                 <button className="reset-button" onClick={handleReset}>
-                  Reset All Fields
+                  🧹 Clear
                 </button>
                 
                 <button className="file-manager-button" onClick={() => setShowFileManager(true)} style={{ marginTop: '15px' }}>
-                  File Manager
+                  📁 File Manager
                 </button>
+
+                {/* YAML Action Buttons Group */}
+                <div className="yaml-actions-group">
+                  <button onClick={handleDownloadYaml} disabled={!yamlOutput.trim()} className="sidebar-action-button">
+                    📤 Download YAML
+                  </button>
+                  <button className="sidebar-action-button deploy-button" onClick={handleDeploy} disabled={!yamlOutput.trim()}>
+                    🚀 Deploy
+                  </button>
+                  <button onClick={handleImport} className="sidebar-action-button">
+                    📥 Import
+                  </button>
+                  <button onClick={handleSave} disabled={!yamlOutput.trim()} className="sidebar-action-button">
+                    💾 Save
+                  </button>
+                </div>
               </div>
               <div
                 className="reactflow-wrapper"
                 ref={reactFlowWrapper}
                 onDrop={onDrop}
                 onDragOver={onDragOver}
+                onClick={handleCanvasClick}
+                onMouseDown={handleCanvasMouseDown}
+                onMouseMove={handleCanvasMouseMove}
+                onMouseUp={handleCanvasMouseUp}
+                data-annotation-tool={activeTool}
               >
                 <ReactFlow
                   nodes={nodes}
@@ -2850,35 +3282,166 @@ const App = ({ user, parentSetMode }) => {
                   edgeTypes={edgeTypes}
                   defaultEdgeOptions={{ type: 'custom' }}
                 />
+                
+                {/* Render annotations */}
+                <svg className="annotation-layer" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1000 }}>
+                  {annotations.map((annotation) => {
+                    if (annotation.type === 'text') {
+                      return (
+                        <text
+                          key={annotation.id}
+                          x={annotation.x}
+                          y={annotation.y}
+                          fill={annotation.color}
+                          fontSize={annotation.style.fontSize}
+                          fontWeight={annotation.style.bold ? 'bold' : 'normal'}
+                          fontStyle={annotation.style.italic ? 'italic' : 'normal'}
+                          textDecoration={annotation.style.underline ? 'underline' : 'none'}
+                          style={{ pointerEvents: 'all', cursor: activeTool === 'select' ? 'move' : 'pointer' }}
+                          onClick={(e) => handleAnnotationSelect(annotation, e)}
+                          onMouseDown={(e) => handleAnnotationMouseDown(annotation, e)}
+                          className={`annotation-element ${selectedAnnotation?.id === annotation.id ? 'selected-annotation' : ''}`}
+                        >
+                          {annotation.text}
+                        </text>
+                      );
+                    } else if (annotation.type === 'rectangle') {
+                      const width = Math.abs(annotation.endX - annotation.startX);
+                      const height = Math.abs(annotation.endY - annotation.startY);
+                      const x = Math.min(annotation.startX, annotation.endX);
+                      const y = Math.min(annotation.startY, annotation.endY);
+                      return (
+                        <g key={annotation.id}>
+                          <rect
+                            x={x}
+                            y={y}
+                            width={width}
+                            height={height}
+                            fill={annotation.color}
+                            fillOpacity={annotation.style.fillOpacity}
+                            stroke={annotation.color}
+                            strokeWidth={annotation.style.strokeWidth}
+                            style={{ pointerEvents: 'all', cursor: activeTool === 'select' ? 'move' : 'pointer' }}
+                            onClick={(e) => handleAnnotationSelect(annotation, e)}
+                            onMouseDown={(e) => handleAnnotationMouseDown(annotation, e)}
+                            className={`annotation-element ${selectedAnnotation?.id === annotation.id ? 'selected-annotation' : ''}`}
+                          />
+                          {/* Resize handle for selected rectangle */}
+                          {selectedAnnotation?.id === annotation.id && activeTool === 'select' && (
+                            <circle
+                              cx={x + width}
+                              cy={y + height}
+                              r={4}
+                              fill="#072452"
+                              stroke="white"
+                              strokeWidth={2}
+                              style={{ cursor: 'nw-resize', pointerEvents: 'all' }}
+                              onMouseDown={(e) => {
+                                e.stopPropagation();
+                                setIsResizing(true);
+                                setResizeHandle('rectangle');
+                              }}
+                            />
+                          )}
+                        </g>
+                      );
+                    } else if (annotation.type === 'circle') {
+                      return (
+                        <g key={annotation.id}>
+                          <circle
+                            cx={annotation.x}
+                            cy={annotation.y}
+                            r={annotation.radius}
+                            fill={annotation.color}
+                            fillOpacity={annotation.style.fillOpacity}
+                            stroke={annotation.color}
+                            strokeWidth={annotation.style.strokeWidth}
+                            style={{ pointerEvents: 'all', cursor: activeTool === 'select' ? 'move' : 'pointer' }}
+                            onClick={(e) => handleAnnotationSelect(annotation, e)}
+                            onMouseDown={(e) => handleAnnotationMouseDown(annotation, e)}
+                            className={`annotation-element ${selectedAnnotation?.id === annotation.id ? 'selected-annotation' : ''}`}
+                          />
+                          {/* Resize handle for selected circle */}
+                          {selectedAnnotation?.id === annotation.id && activeTool === 'select' && (
+                            <circle
+                              cx={annotation.x + annotation.radius}
+                              cy={annotation.y}
+                              r={4}
+                              fill="#072452"
+                              stroke="white"
+                              strokeWidth={2}
+                              style={{ cursor: 'ew-resize', pointerEvents: 'all' }}
+                              onMouseDown={(e) => {
+                                e.stopPropagation();
+                                setIsResizing(true);
+                                setResizeHandle('radius');
+                              }}
+                            />
+                          )}
+                        </g>
+                      );
+                    }
+                    
+                    return null;
+                  })}
+                </svg>
+
+                {/* Annotation Toolbar */}
+                <AnnotationToolbar
+                  activeTool={activeTool}
+                  setActiveTool={setActiveTool}
+                  onDeleteSelected={handleDeleteSelected}
+                  annotationColor={annotationColor}
+                  setAnnotationColor={setAnnotationColor}
+                  textStyle={textStyle}
+                  setTextStyle={setTextStyle}
+                  shapeStyle={shapeStyle}
+                  setShapeStyle={setShapeStyle}
+                />
+
                 {/* Add React Flow controls */}
                 <Controls />
               </div>
-              <div className="yaml-output">
-              <h3>YAML Editor</h3>
-                {/* Replaced textarea with Editor for syntax highlighting and line numbers */}
-                {/* You may need to add specific CSS classes/styles to .editor-container */}
-                {/* for features like line numbers background, etc. */}
-                {/* For basic line numbers, react-simple-code-editor often needs a container with specific padding/styling. */}
-                <div className="editor-container" style={{ overflow: 'auto', height: '500px', border: '1px solid #ccc', borderRadius: '4px' }}>
-                  <Editor
-                    value={editableYaml}
-                    onValueChange={newYaml => handleYamlChange(newYaml)}
-                    highlight={code => highlight(code, languages.yaml, 'yaml')}
-                    padding={10}
-                    style={{
-                      fontFamily: '"Fira code", "Fira Mono", Consolas, "DejaVu Sans Mono", Monaco, "Andale Mono", "Ubuntu Mono", monospace',
-                      fontSize: 12,
-                      // .Editor__textarea and .Editor__editor might need specific styles
-                      // to align text and line numbers if using pseudo-elements or similar.
-                      // For basic line numbers, react-simple-code-editor often needs a container with specific padding/styling.
-                    }}
-                  />
-                </div>
-                <div className="button-group">
-                  <button onClick={handleDownloadYaml} disabled={!yamlOutput.trim()}>Download YAML</button>
-                  <button className="deploy-button" onClick={handleDeploy} disabled={!yamlOutput.trim()}>Deploy</button>
-                  <button onClick={handleImport}>Import</button>
-                  <button onClick={handleSave} disabled={!yamlOutput.trim()}>Save</button>
+              
+              {/* YAML Editor with Toggle Button */}
+              <div className={`yaml-output-container ${isYamlEditorCollapsed ? 'collapsed' : 'expanded'}`}>
+                <button 
+                  className="yaml-toggle-button"
+                  onClick={handleToggleYamlEditor}
+                  title={isYamlEditorCollapsed ? 'Show YAML Editor' : 'Hide YAML Editor'}
+                >
+                  {isYamlEditorCollapsed ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+                </button>
+                
+                                  <div className="yaml-output">
+                    <h3>YAML Editor</h3>
+                    {/* Replaced textarea with Editor for syntax highlighting and line numbers */}
+                    {/* You may need to add specific CSS classes/styles to .editor-container */}
+                    {/* for features like line numbers background, etc. */}
+                    {/* For basic line numbers, react-simple-code-editor often needs a container with specific padding/styling. */}
+                    <div className="editor-container-with-lines" style={{ overflow: 'auto', height: '500px', border: '1px solid #ccc', borderRadius: '4px', width: '100%' }}>
+                      <div className="line-numbers" aria-hidden="true">
+                        {editableYaml.split('\n').map((_, index) => (
+                          <div key={index} className="line-number">
+                            {index + 1}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="editor-content">
+                        <Editor
+                          value={editableYaml}
+                          onValueChange={newYaml => handleYamlChange(newYaml)}
+                          highlight={code => highlight(code, languages.yaml, 'yaml')}
+                          padding={10}
+                          style={{
+                            fontFamily: '"Fira code", "Fira Mono", Consolas, "DejaVu Sans Mono", Monaco, "Andale Mono", "Ubuntu Mono", monospace',
+                            fontSize: 12,
+                            minHeight: '100%',
+                            outline: 'none'
+                          }}
+                        />
+                      </div>
+                    </div>
                 </div>
               </div>
             </>
