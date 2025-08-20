@@ -743,7 +743,7 @@ const ClabServers = ({ user }) => {
                                         'Authorization': `Bearer ${token}`
                                       },
                                       body: JSON.stringify({
-                                        topo_file: topology.labPath
+                                        topologySourceUrl: topology.labPath
                                       }),
                                     });
 
