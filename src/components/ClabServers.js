@@ -738,14 +738,27 @@ const ClabServers = ({ user }) => {
                                     
                                     // First, read the topology file content from the server
                                     console.log('Reading topology file:', topology.labPath);
-                                    const topoFileResponse = await fetch(`http://${serverIp}:3001/api/files/read?serverIp=${serverIp}&path=${encodeURIComponent(topology.labPath)}&username=${user?.username}`);
+                                    console.log('Server IP:', serverIp);
+                                    console.log('Username:', user?.username);
+                                    
+                                    const fileReadUrl = `http://${serverIp}:3001/api/files/read?serverIp=${serverIp}&path=${encodeURIComponent(topology.labPath)}&username=${user?.username}`;
+                                    console.log('File read URL:', fileReadUrl);
+                                    
+                                    const topoFileResponse = await fetch(fileReadUrl);
                                     console.log('File read response status:', topoFileResponse.status);
                                     
                                     if (!topoFileResponse.ok) {
-                                      throw new Error(`Failed to read topology file: ${topoFileResponse.status}`);
+                                      const errorText = await topoFileResponse.text();
+                                      console.log('Error response:', errorText);
+                                      throw new Error(`Failed to read topology file: ${topoFileResponse.status} - ${errorText}`);
                                     }
                                     const topoFileData = await topoFileResponse.json();
                                     console.log('File data received:', topoFileData);
+                                    
+                                    // Check if content is empty
+                                    if (!topoFileData.content || topoFileData.content.trim() === '') {
+                                      throw new Error('Topology file is empty or could not be read');
+                                    }
                                     
                                     // Parse the YAML content into JSON object
                                     const topologyContentJson = yaml.load(topoFileData.content);
