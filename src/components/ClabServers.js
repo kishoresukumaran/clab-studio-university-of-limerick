@@ -14,7 +14,6 @@ import React, { useState, useEffect } from 'react';
 import { Loader2, Server } from 'lucide-react';
 import LogModal from './LogModal';
 import SshModal from './SshModal';
-import * as yaml from 'js-yaml';
 
 const ClabServers = ({ user }) => {
   const [topologies, setTopologies] = useState({});
@@ -736,36 +735,11 @@ const ClabServers = ({ user }) => {
                                     // Get authentication token
                                     const token = await getAuthToken(serverIp);
                                     
-                                    // First, read the topology file content from the server
-                                    console.log('Reading topology file:', topology.labPath);
-                                    console.log('Server IP:', serverIp);
-                                    console.log('Username:', user?.username);
-                                    
-                                    const fileReadUrl = `http://${serverIp}:3001/api/files/read?serverIp=${serverIp}&path=${encodeURIComponent(topology.labPath)}&username=${user?.username}`;
-                                    console.log('File read URL:', fileReadUrl);
-                                    
-                                    const topoFileResponse = await fetch(fileReadUrl);
-                                    console.log('File read response status:', topoFileResponse.status);
-                                    
-                                    if (!topoFileResponse.ok) {
-                                      const errorText = await topoFileResponse.text();
-                                      console.log('Error response:', errorText);
-                                      throw new Error(`Failed to read topology file: ${topoFileResponse.status} - ${errorText}`);
-                                    }
-                                    const topoFileData = await topoFileResponse.json();
-                                    console.log('File data received:', topoFileData);
-                                    
-                                    // Check if content is empty
-                                    if (!topoFileData.content || topoFileData.content.trim() === '') {
-                                      throw new Error('Topology file is empty or could not be read');
-                                    }
-                                    
-                                    // Parse the YAML content into JSON object
-                                    const topologyContentJson = yaml.load(topoFileData.content);
-                                    console.log('Parsed topology content:', topologyContentJson);
+                                    // Use the simpler approach with topologySourceUrl (local file path works!)
+                                    console.log('Using topology file path:', topology.labPath);
                                     
                                     const requestBody = {
-                                      topologyContent: topologyContentJson
+                                      topologySourceUrl: topology.labPath
                                     };
                                     console.log('Request body to send:', requestBody);
                                     
