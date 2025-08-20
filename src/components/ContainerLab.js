@@ -400,7 +400,7 @@ const App = ({ user, parentSetMode }) => {
 
   /* This is the list of servers that can be used for the deployment of the topology. Again this is hardcoded, any changes to the servers will need to be made here. This is displayed in the Server table after you click on deploy */
   const serverOptions = [
-    { value: "10.83.12.237", label: "10.83.12.237" }
+    { value: "10.150.48.133", label: "10.150.48.133" }
   ];
 
   // const handleModeChange = (newMode) => {
@@ -1380,7 +1380,7 @@ const App = ({ user, parentSetMode }) => {
               },
               body: JSON.stringify({
                 username: user?.username,
-                password: 'arastra'
+                password: 'ul678clab'
               })
             });
             
@@ -1485,7 +1485,7 @@ const App = ({ user, parentSetMode }) => {
         },
         body: JSON.stringify({
           username: user?.username,
-          password: 'arastra'
+          password: 'ul678clab'
         })
       });
 
@@ -1687,7 +1687,7 @@ const App = ({ user, parentSetMode }) => {
         },
         body: JSON.stringify({
           username: user?.username,
-          password: 'arastra'
+          password: 'ul678clab'
         })
       });
 
@@ -3926,7 +3926,7 @@ const App = ({ user, parentSetMode }) => {
                     </thead>
                     <tbody>
                       {[
-                        { name: 'ul-clab-1', ip: '10.83.12.237', status: 'active' }
+                        { name: 'ul-clab-1', ip: '10.150.48.133', status: 'active' }
                       ].map((server) => (
                         <tr key={server.name} className="hover:bg-gray-50">
                           <td className="border border-gray-200 px-4 py-2">

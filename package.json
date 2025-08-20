@@ -2,7 +2,7 @@
   "name": "reactflow-containerlab",
   "version": "0.1.0",
   "private": true,
-  "proxy": "http://10.83.12.237:8080",
+  "proxy": "http://10.150.48.133:8080",
   "dependencies": {
     "@babel/core": "^7.27.4",
     "@babel/preset-env": "^7.27.2",

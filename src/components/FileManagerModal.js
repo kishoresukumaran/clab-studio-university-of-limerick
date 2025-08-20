@@ -13,7 +13,7 @@ const getDirname = (filepath) => {
 
 const FileManagerModal = ({ isOpen, onClose, onImport, username, mode, title }) => {
   const [servers, setServers] = useState([
-    { ip: "10.83.12.237", name: "ul-clab-1" }
+    { ip: "10.150.48.133", name: "ul-clab-1" }
   ]);
   const [expandedServers, setExpandedServers] = useState({});
   const [fileContents, setFileContents] = useState({});
@@ -927,7 +927,7 @@ const FileManagerModal = ({ isOpen, onClose, onImport, username, mode, title }) 
       };
       
       // Prepare the request - Use the correct API endpoint URL and username prop
-      const response = await fetch('http://10.83.12.237:3001/api/git/clone', {
+      const response = await fetch('http://10.150.48.133:3001/api/git/clone', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1089,7 +1089,7 @@ const FileManagerModal = ({ isOpen, onClose, onImport, username, mode, title }) 
                       style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                     >
                       <FileText size={20} />
-                      <span title="Shared NFS directory from 10.83.12.237">Shared directory</span>
+                      <span title="Shared NFS directory from 10.150.48.133">Shared directory</span>
                     </div>
                     <div className="server-contents" style={{ marginLeft: '20px' }}>
                       <div className="path-navigation" style={{ display: 'flex', alignItems: 'center', margin: '10px 0', gap: '10px' }}>

@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Configure axios with the base URL of our authentication API
-const API_BASE_URL = process.env.REACT_APP_AUTH_API_URL || 'http://10.83.12.237:3000';
+const API_BASE_URL = process.env.REACT_APP_AUTH_API_URL || 'http://10.150.48.133:3000';
 
 // Create an axios instance with the base URL
 const api = axios.create({

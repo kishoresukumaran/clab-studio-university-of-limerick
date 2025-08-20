@@ -41,7 +41,7 @@ const ClabServers = ({ user }) => {
    * - SSH connections to containers
    */
   const servers = [
-    { name: 'ul-clab-1', ip: '10.83.12.237' },
+    { name: 'ul-clab-1', ip: '10.150.48.133' },
   ];
   
   /**
@@ -65,7 +65,7 @@ const ClabServers = ({ user }) => {
         },
         body: JSON.stringify({
           username: user?.username || 'admin',
-          password: 'arastra'
+          password: 'ul678clab'
         }),
       });
       
@@ -548,7 +548,7 @@ const ClabServers = ({ user }) => {
         <tbody>
           {/* This is a list of servers to display in the table. Right now it is hardcoded, any changes to the servers will need to be made here. */}
           {[
-            { name: 'ul-clab-1', ip: '10.83.12.237', status: 'active' }
+            { name: 'ul-clab-1', ip: '10.150.48.133', status: 'active' }
           ].map((server) => (
             <tr key={server.name} className="hover:bg-gray-50">
               <td className="border border-gray-200 px-4 py-2">
