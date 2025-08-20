@@ -737,7 +737,7 @@ const ClabServers = ({ user }) => {
                                 if (window.confirm('Are you sure you want to reconfigure this topology?')) {
                                   try {
                                     setOperationTitle('Reconfiguring Topology');
-                                    setOperationLogs('');
+                                    setOperationLogs('Starting reconfiguration...\n');
                                     setShowLogModal(true);
                                     console.log("Sending reconfigure request:", {
                                       serverIp: serverIp,
@@ -745,25 +745,41 @@ const ClabServers = ({ user }) => {
                                     });
                                     
                                     // Get authentication token
+                                    setOperationLogs(prev => prev + '\nLogging in to containerlab API...\n');
                                     const token = await getAuthToken(serverIp);
+                                    setOperationLogs(prev => prev + 'Successfully logged in to containerlab API\n');
                                     
                                     // Use the simpler approach with topologySourceUrl (local file path works!)
                                     console.log('Using topology file path:', topology.labPath);
+                                    setOperationLogs(prev => prev + `\nPreparing to reconfigure topology: ${topology.topology}\n`);
+                                    setOperationLogs(prev => prev + `Using topology file: ${topology.labPath}\n`);
                                     
                                     const requestBody = {
                                       topologySourceUrl: topology.labPath
                                     };
                                     console.log('Request body to send:', requestBody);
                                     
-                                    // This is the API call to reconfigure the topology using the direct containerlab API
-                                    const response = await fetch(`/api/v1/labs?reconfigure=true`, {
-                                      method: 'POST',
-                                      headers: {
-                                        'Content-Type': 'application/json',
-                                        'Authorization': `Bearer ${token}`
-                                      },
-                                      body: JSON.stringify(requestBody),
-                                    });
+                                    // Start a progress indicator to show reconfiguration is ongoing
+                                    setOperationLogs(prev => prev + '\nReconfiguration in progress. This might take a few minutes...\n');
+                                    
+                                    // Set up a progress indicator that updates every 5 seconds
+                                    const progressInterval = setInterval(() => {
+                                      setOperationLogs(prev => prev + '• Still working on reconfiguration, please wait...\n');
+                                    }, 5000);
+                                    
+                                    try {
+                                      // This is the API call to reconfigure the topology using the direct containerlab API
+                                      const response = await fetch(`/api/v1/labs?reconfigure=true`, {
+                                        method: 'POST',
+                                        headers: {
+                                          'Content-Type': 'application/json',
+                                          'Authorization': `Bearer ${token}`
+                                        },
+                                        body: JSON.stringify(requestBody),
+                                      });
+                                      
+                                      // Clear the progress indicator once we get a response
+                                      clearInterval(progressInterval);
 
                                     // Read the streaming response
                                     const reader = response.body.getReader();
@@ -798,20 +814,27 @@ const ClabServers = ({ user }) => {
                                       }
                                     }
 
-                                    // Check if response was successful
-                                    if (response.ok) {
-                                      setTimeout(() => {
-                                        setShowLogModal(true);
-                                        alert('Topology reconfigured successfully');
-                                        fetchAllTopologies();
-                                      }, 2000);
-                                    } else {
-                                      alert(`Failed to reconfigure topology: ${finalJsonStr || response.statusText}`);
+                                      // Check if response was successful
+                                      if (response.ok) {
+                                        setOperationLogs(prev => prev + '\nReconfiguration completed successfully!\n');
+                                        setTimeout(() => {
+                                          setShowLogModal(true);
+                                          alert('Topology reconfigured successfully');
+                                          fetchAllTopologies();
+                                        }, 2000);
+                                      } else {
+                                        setOperationLogs(prev => prev + `\nReconfiguration failed: ${finalJsonStr || response.statusText}\n`);
+                                        alert(`Failed to reconfigure topology: ${finalJsonStr || response.statusText}`);
+                                      }
+                                    } catch (error) {
+                                      // Make sure to clear the interval if there's an error
+                                      clearInterval(progressInterval);
+                                      throw error;
                                     }
                                   } catch (error) {
                                     console.error('Error reconfiguring topology:', error);
+                                    setOperationLogs(prev => prev + `\nError: ${error.message}`);
                                     alert(`Error reconfiguring topology: ${error.message}`);
-                                    setShowLogModal(false);
                                   }
                                 }
                               }}
