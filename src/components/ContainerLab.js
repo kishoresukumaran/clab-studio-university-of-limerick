@@ -620,7 +620,7 @@ const App = ({ user, parentSetMode }) => {
       if (nodeType === 'router') {
         setNodeNamePrefix('ceos');
         setNodeKind('ceos');
-        setNodeImage('ceos:4.34.0F');
+        setNodeImage('ceos:4.34.1F');
       } else if (nodeType === 'bridge') {
         setNodeNamePrefix('bridge');
         setNodeKind('linux');
@@ -1044,7 +1044,19 @@ const App = ({ user, parentSetMode }) => {
 
   /* This is the function to handle the change in the node kind. It is used to update the YAML output of the topology when the node kind is changed. */
   const handleNodeKindChange = (event) => {
-    setNodeKind(event.target.value);
+    const selectedKind = event.target.value;
+    setNodeKind(selectedKind);
+    
+    // Auto-select default image based on kind
+    if (selectedKind === 'ceos') {
+      setNodeImage('ceos:4.34.1F');
+    } else if (selectedKind === 'sonic-vm') {
+      setNodeImage('sonic-vm:202411');
+    } else if (selectedKind === 'linux') {
+      setNodeImage('alpine');
+    } else {
+      setNodeImage('');
+    }
   };
 
   /* This is the function to handle the change in the node image. It is used to update the YAML output of the topology when the node image is changed. */
@@ -3508,12 +3520,7 @@ const App = ({ user, parentSetMode }) => {
                   <label>Kind: *</label>
                   <select
                     value={nodeKind}
-                    onChange={(e) => {
-                      const newValue = e.target.value;
-                      setNodeKind(newValue);
-                      setNodeImage('');
-                      handleNodeKindChange({ target: { value: newValue } });
-                    }}
+                    onChange={handleNodeKindChange}
                     className={`image-select ${nodeModalWarning && !nodeKind.trim() ? 'input-error' : ''}`}
                   >
                     <option value="">Select a kind</option>
