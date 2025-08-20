@@ -737,14 +737,24 @@ const ClabServers = ({ user }) => {
                                     const token = await getAuthToken(serverIp);
                                     
                                     // First, read the topology file content from the server
+                                    console.log('Reading topology file:', topology.labPath);
                                     const topoFileResponse = await fetch(`http://${serverIp}:3001/api/files/read?serverIp=${serverIp}&path=${encodeURIComponent(topology.labPath)}&username=${user?.username}`);
+                                    console.log('File read response status:', topoFileResponse.status);
+                                    
                                     if (!topoFileResponse.ok) {
-                                      throw new Error('Failed to read topology file');
+                                      throw new Error(`Failed to read topology file: ${topoFileResponse.status}`);
                                     }
                                     const topoFileData = await topoFileResponse.json();
+                                    console.log('File data received:', topoFileData);
                                     
                                     // Parse the YAML content into JSON object
                                     const topologyContentJson = yaml.load(topoFileData.content);
+                                    console.log('Parsed topology content:', topologyContentJson);
+                                    
+                                    const requestBody = {
+                                      topologyContent: topologyContentJson
+                                    };
+                                    console.log('Request body to send:', requestBody);
                                     
                                     // This is the API call to reconfigure the topology using the direct containerlab API
                                     const response = await fetch(`/api/v1/labs?reconfigure=true`, {
@@ -753,9 +763,7 @@ const ClabServers = ({ user }) => {
                                         'Content-Type': 'application/json',
                                         'Authorization': `Bearer ${token}`
                                       },
-                                      body: JSON.stringify({
-                                        topologyContent: topologyContentJson
-                                      }),
+                                      body: JSON.stringify(requestBody),
                                     });
 
                                     // Read the streaming response
