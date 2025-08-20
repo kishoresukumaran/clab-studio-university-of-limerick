@@ -49,7 +49,8 @@ const FileManagerModal = ({ isOpen, onClose, onImport, username, mode, title }) 
     const initialExpandedState = {};
     
     servers.forEach(server => {
-      initialPaths[server.ip] = `/home/clab_nfs_share/containerlab_topologies/${username}`;
+      // initialPaths[server.ip] = `/home/clab_nfs_share/containerlab_topologies/${username}`;
+      initialPaths[server.ip] = `/home/${username}/.clab`;
       initialExpandedState[server.ip] = true; // Always expanded by default
     });
     
@@ -61,7 +62,8 @@ const FileManagerModal = ({ isOpen, onClose, onImport, username, mode, title }) 
     if (mode === 'import' || mode === 'select' || mode === 'manage') {
       const clabIre3 = servers.find(server => server.name === 'clab-ire-3');
       if (clabIre3) {
-        const defaultImportPath = `/home/clab_nfs_share/containerlab_topologies/${username}`;
+        // const defaultImportPath = `/home/clab_nfs_share/containerlab_topologies/${username}`;
+        const defaultImportPath = `/home/${username}/.clab`;
         setCurrentPaths(prev => ({ ...prev, [clabIre3.ip]: defaultImportPath }));
         fetchContents(clabIre3.ip, defaultImportPath);
         setActiveServer(clabIre3.ip); // Set active server for import/select mode
@@ -74,7 +76,8 @@ const FileManagerModal = ({ isOpen, onClose, onImport, username, mode, title }) 
     } else if (mode === 'save') {
       const clabIre3 = servers.find(server => server.name === 'clab-ire-3');
       if (clabIre3) {
-        const initialPath = `/home/clab_nfs_share/containerlab_topologies/${username}`;
+        // const initialPath = `/home/clab_nfs_share/containerlab_topologies/${username}`;
+        const initialPath = `/home/${username}/.clab`;
         setSelectedFile({ serverIp: clabIre3.ip, path: initialPath });
         fetchContents(clabIre3.ip, initialPath);
         setActiveServer(clabIre3.ip); // Set active server for save mode
