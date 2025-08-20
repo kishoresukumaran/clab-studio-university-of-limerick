@@ -373,15 +373,6 @@ const App = ({ user, parentSetMode }) => {
   /* This is the list of images that can be used for the nodes in the topology. This is displayed in the Image drop down in the Router details box. Right now it is hardcoded, any changes to the images will need to be made here. */
   const imageOptions = [
     { value: "ceos:4.34.1F", label: "4.34.1F", kind: "ceos" },
-    { value: "ceos:4.34.0F", label: "4.34.0F", kind: "ceos" },
-    { value: "ceos:4.33.3F", label: "4.33.3F", kind: "ceos" },
-    { value: "ceos:4.32.5.1M", label: "4.32.5.1M", kind: "ceos" },
-    { value: "ceos:4.32.2F", label: "4.32.2F", kind: "ceos" },
-    { value: "ceos:4.31.4M", label: "4.31.4M", kind: "ceos" },
-    { value: "ceos:4.31.2F", label: "4.31.2F", kind: "ceos" },
-    { value: "ceos:4.30.5M", label: "4.30.5M", kind: "ceos" },
-    { value: "ceos:4.29.6M", label: "4.29.6M", kind: "ceos" },
-    { value: "ceos:4.28.10M", label: "4.28.10M", kind: "ceos" },
     { value: "sonic-vm:202411", label: "sonic:202411", kind: "sonic-vm" },
     { value: "alpine", label: "Alpine", kind: "linux" }
   ];
@@ -558,7 +549,7 @@ const App = ({ user, parentSetMode }) => {
       if (type === 'router') {
         setNodeNamePrefix('ceos');
         setNodeKind('ceos');
-        setNodeImage('ceos:4.34.0F');
+        setNodeImage('ceos:4.34.1F');
       } else if (type === 'server') {
         setNodeNamePrefix('host');
         setNodeKind('linux');
