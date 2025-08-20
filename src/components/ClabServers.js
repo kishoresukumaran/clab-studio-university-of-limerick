@@ -14,6 +14,7 @@ import React, { useState, useEffect } from 'react';
 import { Loader2, Server } from 'lucide-react';
 import LogModal from './LogModal';
 import SshModal from './SshModal';
+import * as yaml from 'js-yaml';
 
 const ClabServers = ({ user }) => {
   const [topologies, setTopologies] = useState({});
@@ -735,6 +736,16 @@ const ClabServers = ({ user }) => {
                                     // Get authentication token
                                     const token = await getAuthToken(serverIp);
                                     
+                                    // First, read the topology file content from the server
+                                    const topoFileResponse = await fetch(`http://${serverIp}:3001/api/files/read?serverIp=${serverIp}&path=${encodeURIComponent(topology.labPath)}&username=${user?.username}`);
+                                    if (!topoFileResponse.ok) {
+                                      throw new Error('Failed to read topology file');
+                                    }
+                                    const topoFileData = await topoFileResponse.json();
+                                    
+                                    // Parse the YAML content into JSON object
+                                    const topologyContentJson = yaml.load(topoFileData.content);
+                                    
                                     // This is the API call to reconfigure the topology using the direct containerlab API
                                     const response = await fetch(`/api/v1/labs?reconfigure=true`, {
                                       method: 'POST',
@@ -743,7 +754,7 @@ const ClabServers = ({ user }) => {
                                         'Authorization': `Bearer ${token}`
                                       },
                                       body: JSON.stringify({
-                                        topologySourceUrl: topology.labPath
+                                        topologyContent: topologyContentJson
                                       }),
                                     });
 
