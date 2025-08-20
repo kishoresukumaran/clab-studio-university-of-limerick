@@ -154,9 +154,13 @@ const ClabServers = ({ user }) => {
           return null;
         }
         
+        // Prioritize absLabPath over labPath to ensure we have the full path
+        const fullPath = firstNode.absLabPath || firstNode.labPath;
+        console.log(`Lab ${labName} - labPath: ${firstNode.labPath}, absLabPath: ${firstNode.absLabPath}, using: ${fullPath}`);
+        
         return {
           topology: labName,
-          labPath: firstNode.labPath || firstNode.absLabPath,
+          labPath: fullPath,
           labName: firstNode.lab_name,
           labOwner: firstNode.owner,
           status: firstNode.status || 'N/A', // Add status from the first node
@@ -318,9 +322,13 @@ const ClabServers = ({ user }) => {
             if (!nodes || nodes.length === 0) return null;
             
             const firstNode = nodes[0];
+            // Prioritize absLabPath over labPath to ensure we have the full path
+            const fullPath = firstNode.absLabPath || firstNode.labPath;
+            console.log(`All Labs ${labName} - labPath: ${firstNode.labPath}, absLabPath: ${firstNode.absLabPath}, using: ${fullPath}`);
+            
             return {
               topology: labName,
-              labPath: firstNode.labPath || firstNode.absLabPath,
+              labPath: fullPath,
               labName: firstNode.lab_name,
               labOwner: firstNode.owner,
               status: firstNode.status || 'N/A', // Add status from the first node
@@ -432,9 +440,13 @@ const ClabServers = ({ user }) => {
             })
             .map(([labName, nodes]) => {
               const firstNode = nodes[0];
+              // Prioritize absLabPath over labPath to ensure we have the full path
+              const fullPath = firstNode.absLabPath || firstNode.labPath;
+              console.log(`My Lab ${labName} - labPath: ${firstNode.labPath}, absLabPath: ${firstNode.absLabPath}, using: ${fullPath}`);
+              
               return {
                 topology: labName,
-                labPath: firstNode.labPath || firstNode.absLabPath,
+                labPath: fullPath,
                 labName: firstNode.lab_name,
                 labOwner: firstNode.owner,
                 status: firstNode.status || 'N/A', // Add status from the first node
