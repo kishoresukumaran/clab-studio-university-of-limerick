@@ -1476,34 +1476,10 @@ const App = ({ user, parentSetMode }) => {
       setOperationLogs(prev => prev + `\nReconfiguring lab: ${formattedTopologyName}\n`);
       setOperationLogs(prev => prev + `\nNote: Reconfiguration will only work if this topology has been previously deployed to this server.\n`);
       
-      // Step 1: Login to get the authentication token
-      setOperationLogs(prev => prev + '\nLogging in to containerlab API...\n');
-      
-      // Use relative URL to leverage the proxy setting in package.json
-      const loginResponse = await fetch(`/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          username: user?.username,
-          password: 'ul678clab'
-        })
-      });
-
-      if (!loginResponse.ok) {
-        throw new Error(`Login failed: ${loginResponse.status} ${loginResponse.statusText}`);
-      }
-
-      const loginData = await loginResponse.json();
-      const authToken = loginData.token;
-
-      setOperationLogs(prev => prev + 'Successfully logged in to containerlab API\n');
-      setOperationLogs(prev => prev + '\nPreparing to reconfigure topology...\n');
-
-      // Step 2: Parse the YAML to a JSON object for the API
+      // Parse the YAML to a JSON object for the API
       const topologyContentJson = yaml.load(yamlOutput);
+      
+      setOperationLogs(prev => prev + '\nPreparing to reconfigure topology...\n');
       
       // Start a progress indicator to show reconfiguration is ongoing
       setOperationLogs(prev => prev + '\nReconfiguration in progress. This might take a few minutes...\n');
@@ -1514,17 +1490,18 @@ const App = ({ user, parentSetMode }) => {
       }, 5000);
       
       try {
-        // Step 3: Send the topology to the containerlab API with reconfigure=true
-        const deployResponse = await fetch(`/api/v1/labs?reconfigure=true`, {
+        // Step 3: Send the topology to the Express API server for reconfiguration
+        const deployResponse = await fetch(`http://${serverIp}:3001/api/containerlab/reconfigure`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
-          body: JSON.stringify({
-            topologyContent: topologyContentJson
-          })
+          body: (() => {
+            const formData = new FormData();
+            const yamlBlob = new Blob([yamlOutput], { type: 'text/yaml' });
+            const fileName = `${topologyContentJson.name || 'topology'}.yaml`;
+            formData.append('file', yamlBlob, fileName);
+            formData.append('serverIp', serverIp);
+            formData.append('username', user?.username || 'user');
+            return formData;
+          })()
         });
         
         // Clear the progress indicator once we get a response
@@ -1535,18 +1512,16 @@ const App = ({ user, parentSetMode }) => {
           throw new Error(`Reconfiguration failed: ${deployResponse.status} - ${errorText}`);
         }
         
-        // Process the response here inside the try block
-        const contentType = deployResponse.headers.get('content-type');
-        let responseData;
+        // Process the streaming response from Express server
+        const reader = deployResponse.body.getReader();
+        const decoder = new TextDecoder();
         
-        if (contentType && contentType.includes('application/json')) {
-          responseData = await deployResponse.json();
-          setOperationLogs(prev => prev + '\nReconfiguration completed successfully!\n');
-          setOperationLogs(prev => prev + JSON.stringify(responseData, null, 2));
-        } else {
-          responseData = await deployResponse.text();
-          setOperationLogs(prev => prev + '\nReconfiguration completed successfully!\n');
-          setOperationLogs(prev => prev + responseData);
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          const chunk = decoder.decode(value, { stream: true });
+          setOperationLogs(prev => prev + chunk);
         }
         
         setDeploymentSuccess(true);
@@ -1678,34 +1653,10 @@ const App = ({ user, parentSetMode }) => {
         forceQuotes: true
       }) : yamlOutput;
 
-      // Step 1: Login to get the authentication token
-      setOperationLogs(prev => prev + '\nLogging in to containerlab API...\n');
-      
-      // Use relative URL to leverage the proxy setting in package.json
-      const loginResponse = await fetch(`/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          username: user?.username,
-          password: 'ul678clab'
-        })
-      });
-
-      if (!loginResponse.ok) {
-        throw new Error(`Login failed: ${loginResponse.status} ${loginResponse.statusText}`);
-      }
-
-      const loginData = await loginResponse.json();
-      const authToken = loginData.token;
-
-      setOperationLogs(prev => prev + 'Successfully logged in to containerlab API\n');
-      setOperationLogs(prev => prev + '\nPreparing to deploy topology...\n');
-
-      // Step 2: Parse the YAML to a JSON object for the API
+      // Parse the YAML to a JSON object for the API
       const topologyContentJson = yaml.load(finalYaml);
+      
+      setOperationLogs(prev => prev + '\nPreparing to deploy topology...\n');
       
       // Start a progress indicator to show deployment is ongoing
       setOperationLogs(prev => prev + '\nDeployment in progress. This might take a few minutes...\n');
@@ -1716,17 +1667,18 @@ const App = ({ user, parentSetMode }) => {
       }, 5000);
       
       try {
-        // Step 3: Send the topology to the containerlab API using relative URL
-        const deployResponse = await fetch(`/api/v1/labs`, {
+        // Step 3: Send the topology to the Express API server
+        const deployResponse = await fetch(`http://${serverIp}:3001/api/containerlab/deploy`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
-          body: JSON.stringify({
-            topologyContent: topologyContentJson
-          })
+          body: (() => {
+            const formData = new FormData();
+            const yamlBlob = new Blob([finalYaml], { type: 'text/yaml' });
+            const fileName = `${topologyContentJson.name || 'topology'}.yaml`;
+            formData.append('file', yamlBlob, fileName);
+            formData.append('serverIp', serverIp);
+            formData.append('username', user?.username || 'user');
+            return formData;
+          })()
         });
         
         // Clear the progress indicator once we get a response
@@ -1737,18 +1689,16 @@ const App = ({ user, parentSetMode }) => {
           throw new Error(`Deployment failed: ${deployResponse.status} - ${errorText}`);
         }
         
-        // Process the response here inside the try block
-        const contentType = deployResponse.headers.get('content-type');
-        let responseData;
+        // Process the streaming response from Express server
+        const reader = deployResponse.body.getReader();
+        const decoder = new TextDecoder();
         
-        if (contentType && contentType.includes('application/json')) {
-          responseData = await deployResponse.json();
-          setOperationLogs(prev => prev + '\nDeployment completed successfully!\n');
-          setOperationLogs(prev => prev + JSON.stringify(responseData, null, 2));
-        } else {
-          responseData = await deployResponse.text();
-          setOperationLogs(prev => prev + '\nDeployment completed successfully!\n');
-          setOperationLogs(prev => prev + responseData);
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          const chunk = decoder.decode(value, { stream: true });
+          setOperationLogs(prev => prev + chunk);
         }
         
         setDeploymentSuccess(true);
