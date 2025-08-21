@@ -273,7 +273,7 @@ const App = ({ user, parentSetMode }) => {
   const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
   const [selectedServer, setSelectedServer] = useState(null);
   const [deployLoading, setDeployLoading] = useState({});
-  const [reconfigureLoading, setReconfigureLoading] = useState({});
+
   const [labExistsOnServer, setLabExistsOnServer] = useState({});
   const [showLogModal, setShowLogModal] = useState(false);
   const [operationLogs, setOperationLogs] = useState('');
@@ -1371,61 +1371,9 @@ const App = ({ user, parentSetMode }) => {
           };
         }
         
-        // Check if the lab exists on this server (only if topology name is not empty)
-        if (formattedTopologyName) {
-          try {
-            // First, we need to login to get an auth token using the proxy
-            const loginResponse = await fetch(`/login`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-              },
-              body: JSON.stringify({
-                username: user?.username,
-                password: 'ul678clab'
-              })
-            });
-            
-            if (loginResponse.ok) {
-              const loginData = await loginResponse.json();
-              const authToken = loginData.token;
-              
-              // Use the official containerlab API to check if the lab exists
-              const inspectResponse = await fetch(
-                `/api/v1/labs/${formattedTopologyName}`,
-                {
-                  headers: {
-                    'Accept': 'application/json',
-                    'Authorization': `Bearer ${authToken}`
-                  }
-                }
-              );
-              
-              if (inspectResponse.status === 200) {
-                // If we get a 200 status, the lab exists
-                labExists[server.value] = true;
-              } else if (inspectResponse.status === 404) {
-                // If we get a 404 status, the lab doesn't exist
-                labExists[server.value] = false;
-              } else {
-                // Any other status, assume the lab doesn't exist
-                labExists[server.value] = false;
-              }
-              
-              console.log(`Lab existence check for ${formattedTopologyName} on ${server.value}: ${labExists[server.value]}`);
-            } else {
-              console.error(`Could not login to check lab existence on ${server.value}`);
-              labExists[server.value] = false;
-            }
-          } catch (error) {
-            console.error(`Error checking lab existence on server ${server.value}:`, error);
-            labExists[server.value] = false;
-          }
-        } else {
-          // If no topology name, lab can't exist
-          labExists[server.value] = false;
-        }
+        // For deployment from topology designer, we'll assume lab doesn't exist initially
+        // The Express API will handle the actual deployment regardless
+        labExists[server.value] = false;
       }
       
       setServerResources(resources);
@@ -1463,7 +1411,7 @@ const App = ({ user, parentSetMode }) => {
         return;
       }
       
-      setReconfigureLoading(prev => ({ ...prev, [serverIp]: true }));
+
       setOperationTitle('Reconfiguring Topology');
       setShowLogModal(true);
       setOperationLogs('Starting reconfiguration...\n');
@@ -1534,8 +1482,6 @@ const App = ({ user, parentSetMode }) => {
     } catch (error) {
       console.error('Error reconfiguring topology:', error);
       setOperationLogs(prev => prev + `\nError: ${error.message}`);
-    } finally {
-      setReconfigureLoading(prev => ({ ...prev, [serverIp]: false }));
     }
   };
 
@@ -3994,27 +3940,7 @@ const App = ({ user, parentSetMode }) => {
                                 )}
                               </button>
                               
-                              <button
-                                onClick={() => handleServerReconfigure(server.ip)}
-                                className={`server-action-btn text-sm px-3 py-1 rounded ${
-                                  reconfigureLoading[server.ip] ? 'bg-gray-400 text-gray-700' : 
-                                  !labExistsOnServer[server.ip] ? 'bg-gray-300 text-gray-500 opacity-60 cursor-not-allowed border border-gray-400' :
-                                  'bg-green-100 text-green-700 hover:bg-green-200 border border-green-400'
-                                }`}
-                                disabled={reconfigureLoading[server.ip] || !labExistsOnServer[server.ip]}
-                                title={
-                                  !labExistsOnServer[server.ip] ? 
-                                  "Cannot reconfigure: This topology has not been deployed to this server yet" : 
-                                  "Reconfigure existing topology"
-                                }
-                              >
-                                {reconfigureLoading[server.ip] ? (
-                                  <div className="flex items-center">
-                                    <Loader2 className="animate-spin mr-2" size={18} />
-                                    Reconfiguring...
-                                  </div>
-                                ) : "Reconfigure"}
-                              </button>
+
                             </div>
                           </td>
                         </tr>
