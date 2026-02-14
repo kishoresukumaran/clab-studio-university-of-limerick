@@ -26,6 +26,7 @@ h1 {
 .dndflow {
   display: flex;
   height: 100%;
+  overflow: hidden;
 }
 
 .node-panel {
@@ -102,26 +103,22 @@ h1 {
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.reactflow-wrapper {
-  flex-grow: 1;
+.cytoscape-wrapper {
+  flex: 1 1 0%;
+  min-width: 0;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.cytoscape-container {
+  width: 100%;
   height: 100%;
   background-color: #ffffff;
-  background-image: 
-    linear-gradient(to right, #f0f0f0 1px, transparent 1px),
-    linear-gradient(to bottom, #f0f0f0 1px, transparent 1px);
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
   background-size: 20px 20px;
-  position: relative;
-}
-
-.react-flow__renderer {
-  background: transparent;
-}
-
-.react-flow__controls {
-  position: absolute;
-  bottom: 10px;
-  left: 10px;
-  z-index: 10;
 }
 
 .yaml-output {
@@ -309,47 +306,7 @@ button:hover {
   background-color: #0056b3;
 }
 
-.custom-node {
-  padding: 10px;
-  border-radius: 5px;
-  background: white;
-  border: 1px solid #ddd;
-  min-width: 150px;
-  text-align: center;
-}
-
-.custom-node .react-flow__handle {
-  width: 6px;
-  height: 6px;
-  background: #555;
-  border: 1px solid #fff;
-  border-radius: 50%;
-}
-
-.custom-node .react-flow__handle:hover {
-  background: #999;
-}
-
-/* Position handles at center of each side */
-.custom-node .react-flow__handle-top {
-  top: -3px;
-  left: 50%;
-}
-
-.custom-node .react-flow__handle-bottom {
-  bottom: -3px;
-  left: 50%;
-}
-
-.custom-node .react-flow__handle-left {
-  left: -3px;
-  top: 50%;
-}
-
-.custom-node .react-flow__handle-right {
-  right: -3px;
-  top: 50%;
-}
+/* Custom node styles removed - Cytoscape handles node rendering via styles */
 
 .kind-section {
   margin-top: 10px;
@@ -360,29 +317,69 @@ button:hover {
 }
 
 .context-menu {
-  position: absolute;
-  background-color: white;
-  box-shadow: 0px 0px 5px rgba(0,0,0,0.3);
-  border-radius: 4px;
-  padding: 5px 0;
+  position: fixed;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  padding: 4px 0;
+  min-width: 160px;
   z-index: 1200;
 }
 
 .context-menu button {
   display: block;
   width: 100%;
-  padding: 8px 16px;
+  padding: 10px 20px;
   border: none;
   background: none;
   text-align: left;
   cursor: pointer;
   color: #333;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .context-menu button:hover {
-  background-color: #072452;
-  color: white;
+  background: #f5f5f5;
+}
+
+.context-menu button.delete-button {
+  color: #e74c3c;
+}
+
+.context-menu button.delete-button:hover {
+  background: #fef2f2;
+}
+
+.connect-mode-banner {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #e8f0fe;
+  border: 1px solid #4285f4;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  color: #333;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.connect-mode-banner button {
+  background: none;
+  border: 1px solid #999;
+  border-radius: 4px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+}
+
+.connect-mode-banner button:hover {
+  background: #f0f0f0;
 }
 
 .kind-input-group,
@@ -593,30 +590,7 @@ button.add-kind:hover {
   background-color: #c82333;
 }
 
-.network-node {
-  padding: 15px;
-  background: #f8f9fa;
-  border: 2px solid #495057;
-  border-radius: 8px;
-  min-width: 120px;
-  min-height: 80px;
-  position: relative;
-}
-
-.network-node .react-flow__handle {
-  width: 6px;
-  height: 6px;
-  background: #212529;
-  border: 1px solid #868e96;
-  border-radius: 50%;
-  position: absolute;
-}
-
-.network-node .react-flow__handle:hover {
-  background: #495057;
-  transform: scale(1.5);
-  transition: transform 0.2s;
-}
+/* Network node styles removed - Cytoscape handles node rendering via styles */
 
 .node-content {
   display: flex;
@@ -2348,51 +2322,7 @@ button[type="submit"]:active {
   line-height: 1;
 }
 
-/* Custom Node Styling */
-.custom-svg-node {
-  border: none; /* Remove border */
-  background: transparent; /* Remove background */
-  padding: 0; /* Remove padding */
-  display: inline-block; /* Make it wrap content */
-  position: relative; /* For positioning children */
-  /* Remove fixed width and height */
-}
-
-.node-icon-svg {
-  width: 70px; /* Adjust icon size as needed */
-  height: 70px; /* Adjust icon size as needed */
-  display: block; /* Ensures it takes its own line for proper positioning */
-  margin-bottom: 0;
-}
-
-.node-label-svg {
-  position: absolute;
-  bottom: 5px; /* Adjust as needed to place it below the SVG */
-  left: 0; /* Align to the left of the SVG */
-  font-size: 10px; /* Adjust label font size as needed */
-  color: #333;
-  white-space: nowrap; /* Prevent text wrapping */
-}
-
-/* Adjust React Flow Handles */
-.react-flow__handle.custom-handle {
-  width: 2px; /* Even smaller size for the handle */
-  height: 2px; /* Even smaller size for the handle */
-  background: #333; /* Color of the handle */
-  border: 1px solid #fff; /* Border of the handle */
-  position: absolute;
-  transform: translateX(-50%); /* Center horizontally */
-}
-
-.react-flow__handle.custom-handle-top {
-  top: 20%; /* Position on the top edge */
-  left: 50%;
-}
-
-.react-flow__handle.custom-handle-bottom {
-  bottom: 20%; /* Position on the bottom edge */
-  left: 50%;
-}
+/* Custom node/edge rendering handled by Cytoscape.js styles */
 
 .node-buttons {
   display: grid;
@@ -2636,44 +2566,7 @@ button[type="submit"]:active {
   box-sizing: border-box;
 }
 
-/* Edge label styles */
-.edge-label {
-  background: #f0f0f0;
-  padding: 2px 5px;
-  border-radius: 3px;
-  font-size: 7px;
-  font-weight: 500;
-  /*border: 1px solid #ccc;*/
-  text-align: center;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  transition: all 0.2s ease;
-  user-select: none;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.edge-foreignobject {
-  overflow: visible;
-  pointer-events: all;
-}
-
-.edge-label:hover {
-  background-color: #e6e6e6;
-  transform: scale(1.05);
-  cursor: default;
-}
-
-.start-label {
-  color: #3182ce;
-}
-
-.end-label {
-  color: #2b6cb0;
-}
+/* Edge labels now rendered by Cytoscape.js natively */
 
 /* Make sure labels don't get dragged with the canvas */
 .nodrag {
@@ -2916,19 +2809,19 @@ button[type="submit"]:active {
 }
 
 /* Improve cursor feedback */
-.reactflow-wrapper[data-annotation-tool="rectangle"] {
+.cytoscape-wrapper[data-annotation-tool="rectangle"] {
   cursor: crosshair;
 }
 
-.reactflow-wrapper[data-annotation-tool="text"] {
+.cytoscape-wrapper[data-annotation-tool="text"] {
   cursor: text;
 }
 
-.reactflow-wrapper[data-annotation-tool="circle"] {
+.cytoscape-wrapper[data-annotation-tool="circle"] {
   cursor: crosshair;
 }
 
-.reactflow-wrapper[data-annotation-tool="select"] {
+.cytoscape-wrapper[data-annotation-tool="select"] {
   cursor: default;
 }
 
@@ -2973,6 +2866,7 @@ button[type="submit"]:active {
 .yaml-output-container {
   position: relative;
   display: flex;
+  flex-shrink: 0;
   width: 25%; /* Further reduced for more design space */
   min-width: 320px; /* Reduced min-width for more flexibility */
   max-width: 420px; /* Reduced max-width */
@@ -3122,7 +3016,7 @@ button[type="submit"]:active {
 }
 
 /* Adjust ReactFlow wrapper when YAML editor is collapsed */
-.dndflow .reactflow-wrapper {
+.dndflow .cytoscape-wrapper {
   flex-grow: 1;
   transition: all 0.3s ease-in-out;
 }

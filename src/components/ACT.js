@@ -10,27 +10,22 @@
  * 
  */
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import ReactFlow, {
-  ReactFlowProvider,
-  addEdge,
-  useNodesState,
-  useEdgesState,
-  Controls
-} from 'react-flow-renderer';
+import CytoscapeCanvas from './CytoscapeCanvas';
 import Sidebar from '../Sidebar';
 import yaml from 'js-yaml';
 import '../styles.css';
 
 const ACT = () => {
-  const reactFlowWrapper = useRef(null);
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const cyCanvasRef = useRef(null);
+  const [nodes, setNodes] = useState([]);
+  const [edges, setEdges] = useState([]);
+  const [connectSourceNode, setConnectSourceNode] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [nodeName, setNodeName] = useState("");
   const [newNode, setNewNode] = useState(null);
   const [yamlOutput, setYamlOutput] = useState("");
   const [nodeModalWarning, setNodeModalWarning] = useState(false);
-  const [reactFlowInstance, setReactFlowInstance] = useState(null);
+  // cyCanvasRef used instead of reactFlowInstance
   const [nodeIp, setNodeIp] = useState("");
   const [nodeType, setNodeType] = useState("");
   const [deviceModel, setDeviceModel] = useState("");
@@ -71,17 +66,30 @@ const ACT = () => {
   const [newEdgeData, setNewEdgeData] = useState(null);
   const [edgeModalWarning, setEdgeModalWarning] = useState(false);
 
-  const onConnect = useCallback((params) => {
-    const sourceNode = nodes.find(node => node.id === params.source);
-    const targetNode = nodes.find(node => node.id === params.target);
-    
-    setNewEdgeData({
-      ...params,
-      sourceNodeName: sourceNode.data.label,
-      targetNodeName: targetNode.data.label
-    });
-    setIsEdgeModalOpen(true);
-  }, [nodes]);
+  // Handle "Connect" context menu action
+  const handleConnectNode = useCallback(() => {
+    setConnectSourceNode(contextMenu.element);
+    setContextMenu(null);
+  }, [contextMenu]);
+
+  const onNodeTap = useCallback((nodeData) => {
+    if (connectSourceNode && nodeData.id !== connectSourceNode.id) {
+      const sourceNode = nodes.find(n => n.id === connectSourceNode.id);
+      const targetNode = nodes.find(n => n.id === nodeData.id);
+      if (!sourceNode || !targetNode) {
+        setConnectSourceNode(null);
+        return;
+      }
+      setNewEdgeData({
+        source: connectSourceNode.id,
+        target: nodeData.id,
+        sourceNodeName: sourceNode.data.label,
+        targetNodeName: targetNode.data.label,
+      });
+      setIsEdgeModalOpen(true);
+      setConnectSourceNode(null);
+    }
+  }, [connectSourceNode, nodes]);
 
   const onDragOver = useCallback((event) => {
     event.preventDefault();
@@ -91,12 +99,22 @@ const ACT = () => {
   const onDrop = useCallback(
     (event) => {
       event.preventDefault();
-      const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
       const type = event.dataTransfer.getData('application/reactflow');
-      const position = {
-        x: event.clientX - reactFlowBounds.left,
-        y: event.clientY - reactFlowBounds.top,
-      };
+      if (!type) return;
+
+      const cy = cyCanvasRef.current?.getCy();
+      let position;
+      if (cy) {
+        const containerRect = cy.container().getBoundingClientRect();
+        const zoom = cy.zoom();
+        const pan = cy.pan();
+        position = {
+          x: (event.clientX - containerRect.left - pan.x) / zoom,
+          y: (event.clientY - containerRect.top - pan.y) / zoom,
+        };
+      } else {
+        position = { x: 200, y: 200 };
+      }
 
       const newNode = {
         id: `node_${nodes.length + 1}`,
@@ -110,23 +128,29 @@ const ACT = () => {
     [nodes]
   );
 
-  const onEdgeContextMenu = (event, edge) => {
+  const onEdgeContextMenu = useCallback((event, edge) => {
     event.preventDefault();
+    setConnectSourceNode(null);
     setEdgeContextMenu({
       mouseX: event.clientX - 2,
       mouseY: event.clientY - 4,
       element: edge,
     });
-  };
-  
-  const onNodeContextMenu = (event, node) => {
+  }, []);
+
+  const onNodeContextMenu = useCallback((event, node) => {
     event.preventDefault();
+    setConnectSourceNode(null);
     setContextMenu({
       mouseX: event.clientX - 2,
       mouseY: event.clientY - 4,
       element: node,
     });
-  };
+  }, []);
+
+  const onNodeDragStop = useCallback(({ id, position }) => {
+    setNodes(nds => nds.map(n => n.id === id ? { ...n, position } : n));
+  }, []);
 
   const handleEdgeContextMenuClose = () => {
     setEdgeContextMenu(null);
@@ -241,7 +265,7 @@ const ACT = () => {
           targetInterface
         }
       };
-      setEdges((eds) => addEdge(newEdge, eds));
+      setEdges((eds) => [...eds, newEdge]);
     }
   
     setIsEdgeModalOpen(false);
@@ -718,22 +742,17 @@ const ACT = () => {
           </button>
         </div>
       </div>
-      <div className="reactflow-wrapper" ref={reactFlowWrapper}>
-        <ReactFlow
+      <div className="cytoscape-wrapper" onDrop={onDrop} onDragOver={onDragOver}>
+        <CytoscapeCanvas
+          ref={cyCanvasRef}
           nodes={nodes}
           edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onInit={setReactFlowInstance}
-          onDrop={onDrop}
-          onDragOver={onDragOver}
           onNodeContextMenu={onNodeContextMenu}
           onEdgeContextMenu={onEdgeContextMenu}
-          fitView
-        >
-          <Controls />
-        </ReactFlow>
+          onNodeDragStop={onNodeDragStop}
+          onNodeTap={onNodeTap}
+          connectSourceNodeId={connectSourceNode?.id || null}
+        />
       </div>
       <div className="yaml-output">
         <div className="yaml-header-act">
@@ -867,17 +886,15 @@ const ACT = () => {
         <div
           className="context-menu"
           style={{
-            position: 'absolute',
+            position: 'fixed',
             top: contextMenu.mouseY,
             left: contextMenu.mouseX,
-            backgroundColor: 'white',
-            boxShadow: '0px 0px 5px rgba(0,0,0,0.3)',
             zIndex: 1000,
           }}
         >
+          <button onClick={handleConnectNode}>Connect</button>
           <button onClick={handleModifyNode}>Modify</button>
-          <button onClick={handleRemoveNode}>Remove Node</button>
-          <button onClick={handleContextMenuClose}>Cancel</button>
+          <button className="delete-button" onClick={handleRemoveNode}>Delete</button>
         </div>
       )}
 
@@ -885,17 +902,14 @@ const ACT = () => {
         <div
           className="context-menu"
           style={{
-            position: 'absolute',
+            position: 'fixed',
             top: edgeContextMenu.mouseY,
             left: edgeContextMenu.mouseX,
-            backgroundColor: 'white',
-            boxShadow: '0px 0px 5px rgba(0,0,0,0.3)',
             zIndex: 1000,
           }}
         >
           <button onClick={handleModifyEdge}>Modify</button>
-          <button onClick={handleRemoveEdge}>Remove Edge</button>
-          <button onClick={handleEdgeContextMenuClose}>Cancel</button>
+          <button className="delete-button" onClick={handleRemoveEdge}>Delete</button>
         </div>
       )}
     </div>

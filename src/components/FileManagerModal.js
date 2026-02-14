@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Folder, File, ChevronRight, ChevronDown, ArrowUp, Upload, Trash, Plus, PlusCircle, FileText, Copy, Clipboard, Pencil, Check, Edit } from 'lucide-react';
 import pathBrowserify from 'path-browserify';
+import { getClabServers, BACKEND_API_URL, SERVER_IP } from '../utils/config';
 
 // Path utility functions
 const getBasename = (filepath) => {
@@ -12,9 +13,7 @@ const getDirname = (filepath) => {
 };
 
 const FileManagerModal = ({ isOpen, onClose, onImport, username, mode, title }) => {
-  const [servers, setServers] = useState([
-    { ip: "10.150.48.133", name: "ul-clab-1" }
-  ]);
+  const [servers, setServers] = useState(getClabServers());
   const [expandedServers, setExpandedServers] = useState({});
   const [fileContents, setFileContents] = useState({});
   const [currentPaths, setCurrentPaths] = useState({});
@@ -930,7 +929,7 @@ const FileManagerModal = ({ isOpen, onClose, onImport, username, mode, title }) 
       };
       
       // Prepare the request - Use the correct API endpoint URL and username prop
-      const response = await fetch('http://10.150.48.133:3001/api/git/clone', {
+      const response = await fetch(`${BACKEND_API_URL}/api/git/clone`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1092,7 +1091,7 @@ const FileManagerModal = ({ isOpen, onClose, onImport, username, mode, title }) 
                       style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                     >
                       <FileText size={20} />
-                      <span title="Shared NFS directory from 10.150.48.133">Shared directory</span>
+                      <span title={`Shared NFS directory from ${SERVER_IP}`}>Shared directory</span>
                     </div>
                     <div className="server-contents" style={{ marginLeft: '20px' }}>
                       <div className="path-navigation" style={{ display: 'flex', alignItems: 'center', margin: '10px 0', gap: '10px' }}>

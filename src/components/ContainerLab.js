@@ -11,16 +11,7 @@
  * 
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import ReactFlow, {
-  ReactFlowProvider,
-  addEdge,
-  useNodesState,
-  useEdgesState,
-  applyNodeChanges,
-  applyEdgeChanges,
-  ConnectionMode,
-  Controls
-} from "react-flow-renderer";
+import CytoscapeCanvas from './CytoscapeCanvas';
 import Sidebar from "../Sidebar";
 import { saveAs } from "file-saver";
 import "../styles.css";
@@ -28,7 +19,6 @@ import ELK from 'elkjs/lib/elk.bundled.js';
 import { Server, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import LogModal from './LogModal';
 import FileManagerModal from './FileManagerModal';
-import AnnotationToolbar from './AnnotationToolbar';
 import { useTopology } from '../contexts/TopologyContext';
 
 import Editor from 'react-simple-code-editor';
@@ -36,12 +26,8 @@ import { highlight, languages } from 'prismjs/components/prism-core';
 import 'prismjs/components/prism-yaml';
 import 'prismjs/themes/prism-tomorrow.css';
 
-import { v4 as uuidv4 } from 'uuid'; 
-import * as yaml from 'js-yaml'; 
-
-import 'reactflow/dist/style.css';
-import CustomNode from './CustomNode';
-import CustomEdge from './CustomEdge';
+import { v4 as uuidv4 } from 'uuid';
+import * as yaml from 'js-yaml';
 
 const elk = new ELK();
 
@@ -120,9 +106,8 @@ const convertYamlToTopology = (yamlString, existingEdges, existingNodes) => {
     Object.entries(parsedYaml.topology.nodes).forEach(([nodeName, nodeData]) => {
       newNodes.push({
         id: nodeName,
-        type: 'svgNode',
         position: existingPositions[nodeName] || { ...nodePosition },
-        data: { 
+        data: {
           label: nodeName,
           kind: nodeData.kind
         }
@@ -130,16 +115,12 @@ const convertYamlToTopology = (yamlString, existingEdges, existingNodes) => {
       nodePosition.x += 200;
     });
 
-    // Filter and ensure all edges have the custom type
+    // Filter edges to only include those connecting nodes in the new topology
     const filteredEdges = existingEdges
-      .filter(edge => 
-        newNodes.some(node => node.id === edge.source) && 
+      .filter(edge =>
+        newNodes.some(node => node.id === edge.source) &&
         newNodes.some(node => node.id === edge.target)
-      )
-      .map(edge => ({
-        ...edge,
-        type: 'custom'
-      }));
+      );
       
     return {
       nodes: newNodes,
@@ -228,11 +209,12 @@ const generateIpsFromSubnet = (subnet, count) => {
  */
 const App = ({ user, parentSetMode }) => {
   const { topologyState, updateTopologyState } = useTopology();
-  const reactFlowWrapper = useRef(null);
-  
+  const cyCanvasRef = useRef(null);
+
   // Replace local state with context state
-  const [nodes, setNodes, onNodesChange] = useNodesState(topologyState.nodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(topologyState.edges);
+  const [nodes, setNodes] = useState(topologyState.nodes);
+  const [edges, setEdges] = useState(topologyState.edges);
+  const [connectSourceNode, setConnectSourceNode] = useState(null);
   const [yamlOutput, setYamlOutput] = useState(topologyState.yamlOutput);
   const [topologyName, setTopologyName] = useState(topologyState.topologyName);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -268,12 +250,12 @@ const App = ({ user, parentSetMode }) => {
   const [isModifyingEdge, setIsModifyingEdge] = useState(false);
   const [edgeModalWarning, setEdgeModalWarning] = useState(false);
   const [mode, setMode] = useState('containerlab');
-  const [reactFlowInstance, setReactFlowInstance] = useState(null);
+  // reactFlowInstance removed - using cyCanvasRef instead
   const [editableYaml, setEditableYaml] = useState(topologyState.editableYaml);
   const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
   const [selectedServer, setSelectedServer] = useState(null);
   const [deployLoading, setDeployLoading] = useState({});
-
+  const [reconfigureLoading, setReconfigureLoading] = useState({});
   const [labExistsOnServer, setLabExistsOnServer] = useState({});
   const [showLogModal, setShowLogModal] = useState(false);
   const [operationLogs, setOperationLogs] = useState('');
@@ -367,12 +349,20 @@ const App = ({ user, parentSetMode }) => {
   const [isResizing, setIsResizing] = useState(false);
   const [resizeHandle, setResizeHandle] = useState(null);
 
-  const nodeTypes = React.useMemo(() => ({ svgNode: CustomNode }), []);
-  const edgeTypes = React.useMemo(() => ({ custom: CustomEdge }), []);
+  // nodeTypes and edgeTypes removed - Cytoscape handles rendering via styles
 
   /* This is the list of images that can be used for the nodes in the topology. This is displayed in the Image drop down in the Router details box. Right now it is hardcoded, any changes to the images will need to be made here. */
   const imageOptions = [
-    { value: "ceos:4.34.1F", label: "4.34.1F", kind: "ceos" },
+    { value: "arista_ceos:4.35.1F", label: "4.35.1F", kind: "ceos" },
+    { value: "ceos:4.34.0F", label: "4.34.0F", kind: "ceos" },
+    { value: "ceos:4.33.3F", label: "4.33.3F", kind: "ceos" },
+    { value: "ceos:4.32.5.1M", label: "4.32.5.1M", kind: "ceos" },
+    { value: "ceos:4.32.2F", label: "4.32.2F", kind: "ceos" },
+    { value: "ceos:4.31.4M", label: "4.31.4M", kind: "ceos" },
+    { value: "ceos:4.31.2F", label: "4.31.2F", kind: "ceos" },
+    { value: "ceos:4.30.5M", label: "4.30.5M", kind: "ceos" },
+    { value: "ceos:4.29.6M", label: "4.29.6M", kind: "ceos" },
+    { value: "ceos:4.28.10M", label: "4.28.10M", kind: "ceos" },
     { value: "sonic-vm:202411", label: "sonic:202411", kind: "sonic-vm" },
     { value: "alpine", label: "Alpine", kind: "linux" }
   ];
@@ -391,7 +381,7 @@ const App = ({ user, parentSetMode }) => {
 
   /* This is the list of servers that can be used for the deployment of the topology. Again this is hardcoded, any changes to the servers will need to be made here. This is displayed in the Server table after you click on deploy */
   const serverOptions = [
-    { value: "10.150.48.133", label: "10.150.48.133" }
+    { value: "10.83.12.237", label: "10.83.12.237" }
   ];
 
   // const handleModeChange = (newMode) => {
@@ -459,33 +449,46 @@ const App = ({ user, parentSetMode }) => {
     }));
   };
 
-  const onConnect = useCallback(
-    (params) => {
-      // Check if management settings are valid when required
-      if (showMgmt && !validateMgmtSettings()) {
-        return;
+  // Handle "Connect" context menu action: right-click node A -> Connect -> click node B
+  const handleConnectNode = useCallback(() => {
+    setConnectSourceNode(contextMenu.element);
+    setContextMenu(null);
+  }, [contextMenu]);
+
+  const onNodeTap = useCallback(
+    (nodeData) => {
+      if (connectSourceNode && nodeData.id !== connectSourceNode.id) {
+        // Check if management settings are valid when required
+        if (showMgmt && !validateMgmtSettings()) {
+          setConnectSourceNode(null);
+          return;
+        }
+
+        const sourceNode = nodes.find((n) => n.id === connectSourceNode.id);
+        const targetNode = nodes.find((n) => n.id === nodeData.id);
+        if (!sourceNode || !targetNode) {
+          setConnectSourceNode(null);
+          return;
+        }
+
+        const sourceInterfaceNumber = getNextInterfaceNumber(connectSourceNode.id);
+        const targetInterfaceNumber = getNextInterfaceNumber(nodeData.id);
+
+        setNewEdgeData({
+          source: connectSourceNode.id,
+          target: nodeData.id,
+          sourceNodeName: sourceNode.data.label,
+          targetNodeName: targetNode.data.label,
+          sourceInterface: `eth${sourceInterfaceNumber}`,
+          targetInterface: `eth${targetInterfaceNumber}`,
+        });
+        setSourceInterface(`eth${sourceInterfaceNumber}`);
+        setTargetInterface(`eth${targetInterfaceNumber}`);
+        setIsEdgeModalOpen(true);
+        setConnectSourceNode(null);
       }
-
-      const sourceNode = nodes.find((n) => n.id === params.source);
-      const targetNode = nodes.find((n) => n.id === params.target);
-
-      if (!sourceNode || !targetNode) return;
-
-      const sourceInterfaceNumber = getNextInterfaceNumber(params.source);
-      const targetInterfaceNumber = getNextInterfaceNumber(params.target);
-
-      setNewEdgeData({
-        ...params,
-        sourceNodeName: sourceNode.data.label,
-        targetNodeName: targetNode.data.label,
-        sourceInterface: `eth${sourceInterfaceNumber}`,
-        targetInterface: `eth${targetInterfaceNumber}`,
-      });
-      setSourceInterface(`eth${sourceInterfaceNumber}`);
-      setTargetInterface(`eth${targetInterfaceNumber}`);
-      setIsEdgeModalOpen(true);
     },
-    [nodes, nodeInterfaces, showMgmt, mgmtNetwork, ipv4Subnet]
+    [connectSourceNode, nodes, nodeInterfaces, showMgmt, mgmtNetwork, ipv4Subnet]
   );
 
   /* This is the function to validate the topology name. It is used to check if the topology name is empty. */
@@ -525,15 +528,24 @@ const App = ({ user, parentSetMode }) => {
       }
       event.preventDefault();
 
-      const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
       const type = event.dataTransfer.getData("application/reactflow");
 
       if (!type) return;
 
-      const position = {
-        x: event.clientX - reactFlowBounds.left,
-        y: event.clientY - reactFlowBounds.top,
-      };
+      // Convert screen coordinates to Cytoscape model coordinates
+      const cy = cyCanvasRef.current?.getCy();
+      let position;
+      if (cy) {
+        const containerRect = cy.container().getBoundingClientRect();
+        const zoom = cy.zoom();
+        const pan = cy.pan();
+        position = {
+          x: (event.clientX - containerRect.left - pan.x) / zoom,
+          y: (event.clientY - containerRect.top - pan.y) / zoom,
+        };
+      } else {
+        position = { x: 200, y: 200 };
+      }
 
       const newNode = {
         id: getId(),
@@ -549,7 +561,7 @@ const App = ({ user, parentSetMode }) => {
       if (type === 'router') {
         setNodeNamePrefix('ceos');
         setNodeKind('ceos');
-        setNodeImage('ceos:4.34.1F');
+        setNodeImage('ceos:4.34.0F');
       } else if (type === 'server') {
         setNodeNamePrefix('host');
         setNodeKind('linux');
@@ -573,10 +585,9 @@ const App = ({ user, parentSetMode }) => {
   /* This is the function to handle the removal of elements from the topology. It is used to remove a node or an edge from the topology. */
   const onElementsRemove = useCallback(
     (elementsToRemove) => {
-      const nodeChanges = elementsToRemove.filter((el) => el.id.startsWith('node_')).map((node) => ({ id: node.id, type: 'remove' }));
-      const edgeChanges = elementsToRemove.filter((el) => el.id.startsWith('edge_')).map((edge) => ({ id: edge.id, type: 'remove' }));
-      const updatedNodes = applyNodeChanges(nodeChanges, nodes);
-      const updatedEdges = applyEdgeChanges(edgeChanges, edges);
+      const removeIds = new Set(elementsToRemove.map(el => el.id));
+      const updatedNodes = nodes.filter(n => !removeIds.has(n.id));
+      const updatedEdges = edges.filter(e => !removeIds.has(e.id));
       setNodes(updatedNodes);
       setEdges(updatedEdges);
       updateYaml(updatedNodes, updatedEdges);
@@ -620,7 +631,7 @@ const App = ({ user, parentSetMode }) => {
       if (nodeType === 'router') {
         setNodeNamePrefix('ceos');
         setNodeKind('ceos');
-        setNodeImage('ceos:4.34.1F');
+        setNodeImage('ceos:4.34.0F');
       } else if (nodeType === 'bridge') {
         setNodeNamePrefix('bridge');
         setNodeKind('linux');
@@ -1044,19 +1055,7 @@ const App = ({ user, parentSetMode }) => {
 
   /* This is the function to handle the change in the node kind. It is used to update the YAML output of the topology when the node kind is changed. */
   const handleNodeKindChange = (event) => {
-    const selectedKind = event.target.value;
-    setNodeKind(selectedKind);
-    
-    // Auto-select default image based on kind
-    if (selectedKind === 'ceos') {
-      setNodeImage('ceos:4.34.1F');
-    } else if (selectedKind === 'sonic-vm') {
-      setNodeImage('sonic-vm:202411');
-    } else if (selectedKind === 'linux') {
-      setNodeImage('alpine');
-    } else {
-      setNodeImage('');
-    }
+    setNodeKind(event.target.value);
   };
 
   /* This is the function to handle the change in the node image. It is used to update the YAML output of the topology when the node image is changed. */
@@ -1105,7 +1104,6 @@ const App = ({ user, parentSetMode }) => {
       const updatedNode = {
         ...newNode,
         id: updatedNodeId,
-        type: 'svgNode',
         data: {
           ...newNode.data,
           label: nodeName,
@@ -1179,7 +1177,6 @@ const App = ({ user, parentSetMode }) => {
       const newNodeWithData = {
         ...newNode,
         id: finalNodeName, // Use the node name as ID for better YAML mapping
-        type: 'svgNode',
         data: {
           ...newNode.data,
           label: finalNodeName,
@@ -1244,8 +1241,7 @@ const App = ({ user, parentSetMode }) => {
             x: basePosition.x + col * 180, // Spread nodes horizontally
             y: basePosition.y + row * 150  // Spread nodes vertically
           },
-          type: 'svgNode',
-          data: {
+            data: {
             ...newNode.data,
             label: finalNodeName,
             kind: nodeKind,
@@ -1371,9 +1367,61 @@ const App = ({ user, parentSetMode }) => {
           };
         }
         
-        // For deployment from topology designer, we'll assume lab doesn't exist initially
-        // The Express API will handle the actual deployment regardless
-        labExists[server.value] = false;
+        // Check if the lab exists on this server (only if topology name is not empty)
+        if (formattedTopologyName) {
+          try {
+            // First, we need to login to get an auth token using the proxy
+            const loginResponse = await fetch(`/login`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              },
+              body: JSON.stringify({
+                username: user?.username,
+                password: 'arastra'
+              })
+            });
+            
+            if (loginResponse.ok) {
+              const loginData = await loginResponse.json();
+              const authToken = loginData.token;
+              
+              // Use the official containerlab API to check if the lab exists
+              const inspectResponse = await fetch(
+                `/api/v1/labs/${formattedTopologyName}`,
+                {
+                  headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                  }
+                }
+              );
+              
+              if (inspectResponse.status === 200) {
+                // If we get a 200 status, the lab exists
+                labExists[server.value] = true;
+              } else if (inspectResponse.status === 404) {
+                // If we get a 404 status, the lab doesn't exist
+                labExists[server.value] = false;
+              } else {
+                // Any other status, assume the lab doesn't exist
+                labExists[server.value] = false;
+              }
+              
+              console.log(`Lab existence check for ${formattedTopologyName} on ${server.value}: ${labExists[server.value]}`);
+            } else {
+              console.error(`Could not login to check lab existence on ${server.value}`);
+              labExists[server.value] = false;
+            }
+          } catch (error) {
+            console.error(`Error checking lab existence on server ${server.value}:`, error);
+            labExists[server.value] = false;
+          }
+        } else {
+          // If no topology name, lab can't exist
+          labExists[server.value] = false;
+        }
       }
       
       setServerResources(resources);
@@ -1411,7 +1459,7 @@ const App = ({ user, parentSetMode }) => {
         return;
       }
       
-
+      setReconfigureLoading(prev => ({ ...prev, [serverIp]: true }));
       setOperationTitle('Reconfiguring Topology');
       setShowLogModal(true);
       setOperationLogs('Starting reconfiguration...\n');
@@ -1424,10 +1472,34 @@ const App = ({ user, parentSetMode }) => {
       setOperationLogs(prev => prev + `\nReconfiguring lab: ${formattedTopologyName}\n`);
       setOperationLogs(prev => prev + `\nNote: Reconfiguration will only work if this topology has been previously deployed to this server.\n`);
       
-      // Parse the YAML to a JSON object for the API
-      const topologyContentJson = yaml.load(yamlOutput);
+      // Step 1: Login to get the authentication token
+      setOperationLogs(prev => prev + '\nLogging in to containerlab API...\n');
       
+      // Use relative URL to leverage the proxy setting in package.json
+      const loginResponse = await fetch(`/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          username: user?.username,
+          password: 'arastra'
+        })
+      });
+
+      if (!loginResponse.ok) {
+        throw new Error(`Login failed: ${loginResponse.status} ${loginResponse.statusText}`);
+      }
+
+      const loginData = await loginResponse.json();
+      const authToken = loginData.token;
+
+      setOperationLogs(prev => prev + 'Successfully logged in to containerlab API\n');
       setOperationLogs(prev => prev + '\nPreparing to reconfigure topology...\n');
+
+      // Step 2: Parse the YAML to a JSON object for the API
+      const topologyContentJson = yaml.load(yamlOutput);
       
       // Start a progress indicator to show reconfiguration is ongoing
       setOperationLogs(prev => prev + '\nReconfiguration in progress. This might take a few minutes...\n');
@@ -1438,18 +1510,17 @@ const App = ({ user, parentSetMode }) => {
       }, 5000);
       
       try {
-        // Step 3: Send the topology to the Express API server for reconfiguration
-        const deployResponse = await fetch(`http://${serverIp}:3001/api/containerlab/reconfigure`, {
+        // Step 3: Send the topology to the containerlab API with reconfigure=true
+        const deployResponse = await fetch(`/api/v1/labs?reconfigure=true`, {
           method: 'POST',
-          body: (() => {
-            const formData = new FormData();
-            const yamlBlob = new Blob([yamlOutput], { type: 'text/yaml' });
-            const fileName = `${topologyContentJson.name || 'topology'}.yaml`;
-            formData.append('file', yamlBlob, fileName);
-            formData.append('serverIp', serverIp);
-            formData.append('username', user?.username || 'user');
-            return formData;
-          })()
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            topologyContent: topologyContentJson
+          })
         });
         
         // Clear the progress indicator once we get a response
@@ -1460,16 +1531,18 @@ const App = ({ user, parentSetMode }) => {
           throw new Error(`Reconfiguration failed: ${deployResponse.status} - ${errorText}`);
         }
         
-        // Process the streaming response from Express server
-        const reader = deployResponse.body.getReader();
-        const decoder = new TextDecoder();
+        // Process the response here inside the try block
+        const contentType = deployResponse.headers.get('content-type');
+        let responseData;
         
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          
-          const chunk = decoder.decode(value, { stream: true });
-          setOperationLogs(prev => prev + chunk);
+        if (contentType && contentType.includes('application/json')) {
+          responseData = await deployResponse.json();
+          setOperationLogs(prev => prev + '\nReconfiguration completed successfully!\n');
+          setOperationLogs(prev => prev + JSON.stringify(responseData, null, 2));
+        } else {
+          responseData = await deployResponse.text();
+          setOperationLogs(prev => prev + '\nReconfiguration completed successfully!\n');
+          setOperationLogs(prev => prev + responseData);
         }
         
         setDeploymentSuccess(true);
@@ -1482,6 +1555,8 @@ const App = ({ user, parentSetMode }) => {
     } catch (error) {
       console.error('Error reconfiguring topology:', error);
       setOperationLogs(prev => prev + `\nError: ${error.message}`);
+    } finally {
+      setReconfigureLoading(prev => ({ ...prev, [serverIp]: false }));
     }
   };
 
@@ -1599,10 +1674,34 @@ const App = ({ user, parentSetMode }) => {
         forceQuotes: true
       }) : yamlOutput;
 
-      // Parse the YAML to a JSON object for the API
-      const topologyContentJson = yaml.load(finalYaml);
+      // Step 1: Login to get the authentication token
+      setOperationLogs(prev => prev + '\nLogging in to containerlab API...\n');
       
+      // Use relative URL to leverage the proxy setting in package.json
+      const loginResponse = await fetch(`/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          username: user?.username,
+          password: 'arastra'
+        })
+      });
+
+      if (!loginResponse.ok) {
+        throw new Error(`Login failed: ${loginResponse.status} ${loginResponse.statusText}`);
+      }
+
+      const loginData = await loginResponse.json();
+      const authToken = loginData.token;
+
+      setOperationLogs(prev => prev + 'Successfully logged in to containerlab API\n');
       setOperationLogs(prev => prev + '\nPreparing to deploy topology...\n');
+
+      // Step 2: Parse the YAML to a JSON object for the API
+      const topologyContentJson = yaml.load(finalYaml);
       
       // Start a progress indicator to show deployment is ongoing
       setOperationLogs(prev => prev + '\nDeployment in progress. This might take a few minutes...\n');
@@ -1613,18 +1712,17 @@ const App = ({ user, parentSetMode }) => {
       }, 5000);
       
       try {
-        // Step 3: Send the topology to the Express API server
-        const deployResponse = await fetch(`http://${serverIp}:3001/api/containerlab/deploy`, {
+        // Step 3: Send the topology to the containerlab API using relative URL
+        const deployResponse = await fetch(`/api/v1/labs`, {
           method: 'POST',
-          body: (() => {
-            const formData = new FormData();
-            const yamlBlob = new Blob([finalYaml], { type: 'text/yaml' });
-            const fileName = `${topologyContentJson.name || 'topology'}.yaml`;
-            formData.append('file', yamlBlob, fileName);
-            formData.append('serverIp', serverIp);
-            formData.append('username', user?.username || 'user');
-            return formData;
-          })()
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            topologyContent: topologyContentJson
+          })
         });
         
         // Clear the progress indicator once we get a response
@@ -1635,16 +1733,18 @@ const App = ({ user, parentSetMode }) => {
           throw new Error(`Deployment failed: ${deployResponse.status} - ${errorText}`);
         }
         
-        // Process the streaming response from Express server
-        const reader = deployResponse.body.getReader();
-        const decoder = new TextDecoder();
+        // Process the response here inside the try block
+        const contentType = deployResponse.headers.get('content-type');
+        let responseData;
         
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          
-          const chunk = decoder.decode(value, { stream: true });
-          setOperationLogs(prev => prev + chunk);
+        if (contentType && contentType.includes('application/json')) {
+          responseData = await deployResponse.json();
+          setOperationLogs(prev => prev + '\nDeployment completed successfully!\n');
+          setOperationLogs(prev => prev + JSON.stringify(responseData, null, 2));
+        } else {
+          responseData = await deployResponse.text();
+          setOperationLogs(prev => prev + '\nDeployment completed successfully!\n');
+          setOperationLogs(prev => prev + responseData);
         }
         
         setDeploymentSuccess(true);
@@ -1662,29 +1762,54 @@ const App = ({ user, parentSetMode }) => {
     }
   };
 
-  const onNodeContextMenu = (event, node) => {
+  const onNodeContextMenu = useCallback((event, node) => {
     event.preventDefault();
+    // Cancel connect mode if active and user right-clicks
+    setConnectSourceNode(null);
     setContextMenu({
       mouseX: event.clientX - 2,
       mouseY: event.clientY - 4,
       element: node,
       type: 'node',
     });
-  };
+  }, []);
 
-  const onEdgeContextMenu = (event, edge) => {
+  const onEdgeContextMenu = useCallback((event, edge) => {
     event.preventDefault();
+    setConnectSourceNode(null);
     setContextMenu({
       mouseX: event.clientX - 2,
       mouseY: event.clientY - 4,
       element: edge,
       type: 'edge',
     });
-  };
+  }, []);
 
   const handleContextMenuClose = () => {
     setContextMenu(null);
   };
+
+  // Close context menu when clicking anywhere outside it
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handleClickAway = (e) => {
+      if (!e.target.closest('.context-menu')) {
+        setContextMenu(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickAway);
+    return () => document.removeEventListener('mousedown', handleClickAway);
+  }, [contextMenu]);
+
+  // Cancel connect mode on Escape key
+  useEffect(() => {
+    if (!connectSourceNode) return;
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') setConnectSourceNode(null);
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [connectSourceNode]);
 
   /* This is the function to handle the removal of a node from the topology. When you right click on a node and select remove, this function is called. */
   const handleRemoveNode = () => {
@@ -1819,7 +1944,6 @@ const App = ({ user, parentSetMode }) => {
     const newEdge = {
       ...newEdgeData,
       id: edgeId,
-      type: 'custom',
       data: {
         sourceInterface,
         targetInterface
@@ -2061,8 +2185,7 @@ const App = ({ user, parentSetMode }) => {
           
           return {
             id: nodeName,
-            type: 'svgNode',
-            position: { x: 100 + (index % 3) * 200, y: 100 + Math.floor(index / 3) * 150 }, // Grid layout
+                position: { x: 100 + (index % 3) * 200, y: 100 + Math.floor(index / 3) * 150 }, // Grid layout
             data: {
               label: nodeName,
               kind: nodeData.kind || '',
@@ -2084,7 +2207,6 @@ const App = ({ user, parentSetMode }) => {
             id: `edge_${index}`,
             source,
             target,
-            type: 'custom',
             data: {
               sourceInterface,
               targetInterface
@@ -2407,18 +2529,10 @@ const App = ({ user, parentSetMode }) => {
     setShowLogModal(false);
   };
 
-  const onNodeDragStop = useCallback((event, node) => {
+  const onNodeDragStop = useCallback(({ id, position }) => {
     // Only update node position, don't show modal
     setNodes((nds) =>
-      nds.map((n) => {
-        if (n.id === node.id) {
-          return {
-            ...n,
-            position: node.position,
-          };
-        }
-        return n;
-      })
+      nds.map((n) => n.id === id ? { ...n, position } : n)
     );
   }, []);
 
@@ -2634,8 +2748,7 @@ const App = ({ user, parentSetMode }) => {
     setNodeCustomFields(newFields);
   };
 
-  /* This is the function to check if a connection is valid. It is used to validate connections between nodes. */
-  const isValidConnection = () => true;
+  // isValidConnection removed - edge validation handled in Connect flow
 
   /* Annotation Functions */
   const generateAnnotationId = () => `annotation_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -2701,7 +2814,7 @@ const App = ({ user, parentSetMode }) => {
     
     if (activeTool !== 'select') return;
     
-    const rect = event.currentTarget.closest('.reactflow-wrapper').getBoundingClientRect();
+    const rect = event.currentTarget.closest('.cytoscape-wrapper').getBoundingClientRect();
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
     
@@ -2733,8 +2846,8 @@ const App = ({ user, parentSetMode }) => {
   }, [selectedAnnotation]);
 
   const handleCanvasClick = useCallback((event) => {
-    // Prevent if clicking on ReactFlow elements
-    if (event.target.closest('.react-flow__node') || event.target.closest('.react-flow__edge')) {
+    // Prevent if clicking on Cytoscape canvas elements
+    if (event.target.closest('.cytoscape-container')) {
       return;
     }
     
@@ -2787,8 +2900,8 @@ const App = ({ user, parentSetMode }) => {
   }, [activeTool, annotationColor, textStyle, shapeStyle]);
 
   const handleCanvasMouseDown = useCallback((event) => {
-    // Prevent if clicking on ReactFlow elements
-    if (event.target.closest('.react-flow__node') || event.target.closest('.react-flow__edge')) {
+    // Prevent if clicking on Cytoscape canvas elements
+    if (event.target.closest('.cytoscape-container')) {
       return;
     }
 
@@ -2920,7 +3033,6 @@ const App = ({ user, parentSetMode }) => {
 
   return (
     // This is the main container for the topology designer. It is the container that contains HTML elements for the topology designer.
-    <ReactFlowProvider>
       <div className="app">
         <div className="dndflow">
           {mode === 'containerlab' ? (
@@ -3154,152 +3266,32 @@ const App = ({ user, parentSetMode }) => {
                 </div>
               </div>
               <div
-                className="reactflow-wrapper"
-                ref={reactFlowWrapper}
+                className="cytoscape-wrapper"
                 onDrop={onDrop}
                 onDragOver={onDragOver}
-                onClick={handleCanvasClick}
+                onClick={(e) => {
+                  // Cancel connect mode when clicking canvas background
+                  if (connectSourceNode && !e.target.closest('.cytoscape-container canvas')) {
+                    // Let handleCanvasClick run too
+                  }
+                  handleCanvasClick(e);
+                }}
                 onMouseDown={handleCanvasMouseDown}
                 onMouseMove={handleCanvasMouseMove}
                 onMouseUp={handleCanvasMouseUp}
                 data-annotation-tool={activeTool}
               >
-                <ReactFlow
+                <CytoscapeCanvas
+                  ref={cyCanvasRef}
                   nodes={nodes}
                   edges={edges}
-                  onNodesChange={onNodesChange}
-                  onEdgesChange={onEdgesChange}
-                  onConnect={onConnect}
-                  onElementsRemove={onElementsRemove}
-                  isValidConnection={isValidConnection}
-                  fitView
                   onNodeContextMenu={onNodeContextMenu}
                   onEdgeContextMenu={onEdgeContextMenu}
-                  connectionMode={ConnectionMode.LOOSE}
                   onNodeDragStop={onNodeDragStop}
-                  nodeTypes={nodeTypes}
-                  edgeTypes={edgeTypes}
-                  defaultEdgeOptions={{ type: 'custom' }}
+                  onNodeTap={onNodeTap}
+                  connectSourceNodeId={connectSourceNode?.id || null}
                 />
-                
-                {/* Render annotations */}
-                <svg className="annotation-layer" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1000 }}>
-                  {annotations.map((annotation) => {
-                    if (annotation.type === 'text') {
-                      return (
-                        <text
-                          key={annotation.id}
-                          x={annotation.x}
-                          y={annotation.y}
-                          fill={annotation.color}
-                          fontSize={annotation.style.fontSize}
-                          fontWeight={annotation.style.bold ? 'bold' : 'normal'}
-                          fontStyle={annotation.style.italic ? 'italic' : 'normal'}
-                          textDecoration={annotation.style.underline ? 'underline' : 'none'}
-                          style={{ pointerEvents: 'all', cursor: activeTool === 'select' ? 'move' : 'pointer' }}
-                          onClick={(e) => handleAnnotationSelect(annotation, e)}
-                          onMouseDown={(e) => handleAnnotationMouseDown(annotation, e)}
-                          className={`annotation-element ${selectedAnnotation?.id === annotation.id ? 'selected-annotation' : ''}`}
-                        >
-                          {annotation.text}
-                        </text>
-                      );
-                    } else if (annotation.type === 'rectangle') {
-                      const width = Math.abs(annotation.endX - annotation.startX);
-                      const height = Math.abs(annotation.endY - annotation.startY);
-                      const x = Math.min(annotation.startX, annotation.endX);
-                      const y = Math.min(annotation.startY, annotation.endY);
-                      return (
-                        <g key={annotation.id}>
-                          <rect
-                            x={x}
-                            y={y}
-                            width={width}
-                            height={height}
-                            fill={annotation.color}
-                            fillOpacity={annotation.style.fillOpacity}
-                            stroke={annotation.color}
-                            strokeWidth={annotation.style.strokeWidth}
-                            style={{ pointerEvents: 'all', cursor: activeTool === 'select' ? 'move' : 'pointer' }}
-                            onClick={(e) => handleAnnotationSelect(annotation, e)}
-                            onMouseDown={(e) => handleAnnotationMouseDown(annotation, e)}
-                            className={`annotation-element ${selectedAnnotation?.id === annotation.id ? 'selected-annotation' : ''}`}
-                          />
-                          {/* Resize handle for selected rectangle */}
-                          {selectedAnnotation?.id === annotation.id && activeTool === 'select' && (
-                            <circle
-                              cx={x + width}
-                              cy={y + height}
-                              r={4}
-                              fill="#072452"
-                              stroke="white"
-                              strokeWidth={2}
-                              style={{ cursor: 'nw-resize', pointerEvents: 'all' }}
-                              onMouseDown={(e) => {
-                                e.stopPropagation();
-                                setIsResizing(true);
-                                setResizeHandle('rectangle');
-                              }}
-                            />
-                          )}
-                        </g>
-                      );
-                    } else if (annotation.type === 'circle') {
-                      return (
-                        <g key={annotation.id}>
-                          <circle
-                            cx={annotation.x}
-                            cy={annotation.y}
-                            r={annotation.radius}
-                            fill={annotation.color}
-                            fillOpacity={annotation.style.fillOpacity}
-                            stroke={annotation.color}
-                            strokeWidth={annotation.style.strokeWidth}
-                            style={{ pointerEvents: 'all', cursor: activeTool === 'select' ? 'move' : 'pointer' }}
-                            onClick={(e) => handleAnnotationSelect(annotation, e)}
-                            onMouseDown={(e) => handleAnnotationMouseDown(annotation, e)}
-                            className={`annotation-element ${selectedAnnotation?.id === annotation.id ? 'selected-annotation' : ''}`}
-                          />
-                          {/* Resize handle for selected circle */}
-                          {selectedAnnotation?.id === annotation.id && activeTool === 'select' && (
-                            <circle
-                              cx={annotation.x + annotation.radius}
-                              cy={annotation.y}
-                              r={4}
-                              fill="#072452"
-                              stroke="white"
-                              strokeWidth={2}
-                              style={{ cursor: 'ew-resize', pointerEvents: 'all' }}
-                              onMouseDown={(e) => {
-                                e.stopPropagation();
-                                setIsResizing(true);
-                                setResizeHandle('radius');
-                              }}
-                            />
-                          )}
-                        </g>
-                      );
-                    }
-                    
-                    return null;
-                  })}
-                </svg>
-
-                {/* Annotation Toolbar */}
-                <AnnotationToolbar
-                  activeTool={activeTool}
-                  setActiveTool={setActiveTool}
-                  onDeleteSelected={handleDeleteSelected}
-                  annotationColor={annotationColor}
-                  setAnnotationColor={setAnnotationColor}
-                  textStyle={textStyle}
-                  setTextStyle={setTextStyle}
-                  shapeStyle={shapeStyle}
-                  setShapeStyle={setShapeStyle}
-                />
-
-                {/* Add React Flow controls */}
-                <Controls />
+                {/* Cytoscape has built-in zoom/pan via mouse wheel and trackpad */}
               </div>
               
               {/* YAML Editor with Toggle Button */}
@@ -3416,7 +3408,12 @@ const App = ({ user, parentSetMode }) => {
                   <label>Kind: *</label>
                   <select
                     value={nodeKind}
-                    onChange={handleNodeKindChange}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      setNodeKind(newValue);
+                      setNodeImage('');
+                      handleNodeKindChange({ target: { value: newValue } });
+                    }}
                     className={`image-select ${nodeModalWarning && !nodeKind.trim() ? 'input-error' : ''}`}
                   >
                     <option value="">Select a kind</option>
@@ -3726,26 +3723,23 @@ const App = ({ user, parentSetMode }) => {
           <div
             className="context-menu"
             style={{
-              position: 'absolute',
+              position: 'fixed',
               top: contextMenu.mouseY,
               left: contextMenu.mouseX,
-              backgroundColor: 'white',
-              boxShadow: '0px 0px 5px rgba(0,0,0,0.3)',
               zIndex: 1000,
             }}
           >
             {contextMenu.type === 'node' && (
               <>
+                <button onClick={handleConnectNode}>Connect</button>
                 <button onClick={handleModifyNode}>Modify</button>
-                <button onClick={handleRemoveNode}>Remove Node</button>
-                <button onClick={handleContextMenuClose}>Cancel</button>
+                <button className="delete-button" onClick={handleRemoveNode}>Delete</button>
               </>
             )}
             {contextMenu.type === 'edge' && (
               <>
                 <button onClick={handleModifyEdge}>Modify</button>
-                <button onClick={handleRemoveEdge}>Remove Edge</button>
-                <button onClick={handleContextMenuClose}>Cancel</button>
+                <button className="delete-button" onClick={handleRemoveEdge}>Delete</button>
               </>
             )}
           </div>
@@ -3820,7 +3814,7 @@ const App = ({ user, parentSetMode }) => {
                     </thead>
                     <tbody>
                       {[
-                        { name: 'ul-clab-1', ip: '10.150.48.133', status: 'active' }
+                        { name: 'ul-clab-1', ip: '10.83.12.237', status: 'active' }
                       ].map((server) => (
                         <tr key={server.name} className="hover:bg-gray-50">
                           <td className="border border-gray-200 px-4 py-2">
@@ -3940,7 +3934,27 @@ const App = ({ user, parentSetMode }) => {
                                 )}
                               </button>
                               
-
+                              <button
+                                onClick={() => handleServerReconfigure(server.ip)}
+                                className={`server-action-btn text-sm px-3 py-1 rounded ${
+                                  reconfigureLoading[server.ip] ? 'bg-gray-400 text-gray-700' : 
+                                  !labExistsOnServer[server.ip] ? 'bg-gray-300 text-gray-500 opacity-60 cursor-not-allowed border border-gray-400' :
+                                  'bg-green-100 text-green-700 hover:bg-green-200 border border-green-400'
+                                }`}
+                                disabled={reconfigureLoading[server.ip] || !labExistsOnServer[server.ip]}
+                                title={
+                                  !labExistsOnServer[server.ip] ? 
+                                  "Cannot reconfigure: This topology has not been deployed to this server yet" : 
+                                  "Reconfigure existing topology"
+                                }
+                              >
+                                {reconfigureLoading[server.ip] ? (
+                                  <div className="flex items-center">
+                                    <Loader2 className="animate-spin mr-2" size={18} />
+                                    Reconfiguring...
+                                  </div>
+                                ) : "Reconfigure"}
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -4021,7 +4035,6 @@ const App = ({ user, parentSetMode }) => {
           mode="select"
         />
       </div>
-    </ReactFlowProvider>
   );
 };
 
