@@ -92,7 +92,7 @@ app.get('/api/containerlab/labs/inspect/:labName', async (req, res) => {
       try {
         const loginResponse = await axios.post(`http://${serverIp}:8080/login`, {
           username,
-          password: 'arastra'  // Consider using a more secure approach
+          password: 'ul678clab'  // Consider using a more secure approach
         });
         
         token = loginResponse.data.token;
@@ -137,7 +137,7 @@ app.get('/api/containerlab/labs/inspect/:labName', async (req, res) => {
           // Regenerate token
           const loginResponse = await axios.post(`http://${serverIp}:8080/login`, {
             username,
-            password: 'arastra'
+            password: 'ul678clab'
           });
           
           const newToken = loginResponse.data.token;
@@ -260,7 +260,7 @@ app.post('/api/containerlab/labs/deploy', async (req, res) => {
         try {
           const loginResponse = await axios.post(`http://${serverIp}:8080/login`, {
             username,
-            password: 'arastra'  // Consider using a more secure approach
+            password: 'ul678clab'  // Consider using a more secure approach
           });
           
           token = loginResponse.data.token;
@@ -502,7 +502,7 @@ app.get('/api/containerlab/labs', async (req, res) => {
         
         const loginResponse = await axios.post(`http://${serverIp}:8080/login`, {
           username: userToAuth,
-          password: 'arastra'  // Consider using a more secure approach
+          password: 'ul678clab'  // Consider using a more secure approach
         });
         
         token = loginResponse.data.token;
@@ -543,7 +543,7 @@ app.get('/api/containerlab/labs', async (req, res) => {
           const userToAuth = username || 'admin';
           const loginResponse = await axios.post(`http://${serverIp}:8080/login`, {
             username: userToAuth,
-            password: 'arastra'
+            password: 'ul678clab'
           });
           
           const newToken = loginResponse.data.token;
@@ -694,7 +694,7 @@ app.post('/api/containerlab/labs/reconfigure', async (req, res) => {
         try {
           const loginResponse = await axios.post(`http://${serverIp}:8080/login`, {
             username,
-            password: 'arastra'  // Consider using a more secure approach
+            password: 'ul678clab'  // Consider using a more secure approach
           });
           
           token = loginResponse.data.token;

@@ -2,13 +2,13 @@
   "users": [
     {
       "username": "labadmin",
-      "password": "arastra",
+      "password": "ul678clab",
       "role": "admin",
       "displayName": "admin"
     },
     {
       "username": "kishore",
-      "password": "arastra",
+      "password": "ul678clab",
       "role": "user",
       "displayName": "kishore"
     }

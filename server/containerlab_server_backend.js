@@ -49,7 +49,7 @@ const upload = multer({ storage: storage });
 
 const sshConfig = {
     username: 'kishore',
-    password: 'arastra',
+    password: 'ul678clab',
     tryKeyboard: true,
     readyTimeout: 5000
 };
@@ -138,7 +138,7 @@ app.post('/api/containerlab/deploy', upload.single('file'), async (req, res) => 
                 ...sshConfig,
                 host: serverIp,
                 username: username,    
-                password: 'arastra',
+                password: 'ul678clab',
                 tryKeyboard: true,
                 readyTimeout: 5000
             });
@@ -246,7 +246,7 @@ app.post('/api/containerlab/destroy', async (req, res) => {
                 ...sshConfig,
                 host: serverIp,
                 username: username,    
-                password: 'arastra',
+                password: 'ul678clab',
                 tryKeyboard: true,
                 readyTimeout: 5000
             });
@@ -329,7 +329,7 @@ app.post('/api/containerlab/reconfigure', upload.single('file'), async (req, res
                 ...sshConfig,
                 host: serverIp,
                 username: username,    
-                password: 'arastra',
+                password: 'ul678clab',
                 tryKeyboard: true,
                 readyTimeout: 5000
             });
@@ -433,7 +433,7 @@ app.post('/api/containerlab/save', async (req, res) => {
                 ...sshConfig,
                 host: serverIp,
                 username: username,    
-                password: 'arastra',
+                password: 'ul678clab',
                 tryKeyboard: true,
                 readyTimeout: 5000
             });
@@ -576,7 +576,7 @@ app.get('/api/files/list', async (req, res) => {
     await ssh.connect({
       host: serverIp,
       username: username,
-      password: 'arastra', // Assuming all users have the same password
+      password: 'ul678clab', // Assuming all users have the same password
       tryKeyboard: true,
       readyTimeout: 5000
     });
@@ -626,7 +626,7 @@ app.get('/api/files/read', async (req, res) => {
     await ssh.connect({
       host: serverIp,
       username: username,
-      password: 'arastra', // Assuming all users have the same password
+      password: 'ul678clab', // Assuming all users have the same password
       tryKeyboard: true,
       readyTimeout: 5000
     });
@@ -665,7 +665,7 @@ app.post('/api/files/save', upload.single('file'), async (req, res) => {
     await ssh.connect({
       host: serverIp,
       username: username,
-      password: 'arastra', // Assuming all users have the same password
+      password: 'ul678clab', // Assuming all users have the same password
       tryKeyboard: true,
       readyTimeout: 5000
     });
@@ -724,7 +724,7 @@ app.post('/api/files/upload', upload.single('file'), async (req, res) => {
     await ssh.connect({
       host: serverIp,
       username: username,
-      password: 'arastra', // Assuming all users have the same password
+      password: 'ul678clab', // Assuming all users have the same password
       tryKeyboard: true,
       readyTimeout: 5000
     });
@@ -784,7 +784,7 @@ app.delete('/api/files/delete', async (req, res) => {
     await ssh.connect({
       host: serverIp,
       username: username,
-      password: 'arastra', // Assuming all users have the same password
+      password: 'ul678clab', // Assuming all users have the same password
       tryKeyboard: true,
       readyTimeout: 5000
     });
@@ -840,7 +840,7 @@ app.post('/api/files/createDirectory', async (req, res) => {
     await ssh.connect({
       host: serverIp,
       username: username,
-      password: 'arastra', // Assuming all users have the same password
+      password: 'ul678clab', // Assuming all users have the same password
       tryKeyboard: true,
       readyTimeout: 5000
     });
@@ -902,7 +902,7 @@ app.post('/api/files/createFile', async (req, res) => {
     await ssh.connect({
       host: serverIp,
       username: username,
-      password: 'arastra', // Assuming all users have the same password
+      password: 'ul678clab', // Assuming all users have the same password
       tryKeyboard: true,
       readyTimeout: 5000
     });
@@ -994,7 +994,7 @@ app.post('/api/files/copyPaste', async (req, res) => {
                 ...sshConfig,
                 host: sourceServerIp, // Connect to source server
                 username: username,    
-                password: 'arastra',
+                password: 'ul678clab',
                 tryKeyboard: true,
                 readyTimeout: 5000
             });
@@ -1046,7 +1046,7 @@ app.post('/api/files/rename', async (req, res) => {
         await ssh.connect({
             host: serverIp,
             username: username,
-            password: 'arastra',
+            password: 'ul678clab',
             tryKeyboard: true,
             readyTimeout: 5000
         });
@@ -1079,8 +1079,8 @@ app.post('/api/git/clone', async (req, res) => {
       });
     }
 
-    // Server IP for git operations (from environment variable or fallback)
-    const serverIp = process.env.SERVER_IP || '10.83.12.237';
+    // Set the server IP to 10.83.12.237 for git operations
+    const serverIp = '10.83.12.237';
     
     // Set up streaming response
     res.setHeader('Content-Type', 'text/plain');
@@ -1111,7 +1111,7 @@ app.post('/api/git/clone', async (req, res) => {
         ...sshConfig,
         host: serverIp,
         username: username,    
-        password: 'arastra',
+        password: 'ul678clab',
         tryKeyboard: true,
         readyTimeout: 10000
       });

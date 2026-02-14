@@ -14,7 +14,6 @@ import React, { useState, useEffect } from 'react';
 import { Loader2, Server } from 'lucide-react';
 import LogModal from './LogModal';
 import SshModal from './SshModal';
-import { getClabServers, getServersWithStatus } from '../utils/config';
 
 const ClabServers = ({ user }) => {
   const [topologies, setTopologies] = useState({});
@@ -41,7 +40,9 @@ const ClabServers = ({ user }) => {
    * - Saving configurations
    * - SSH connections to containers
    */
-  const servers = getClabServers();
+  const servers = [
+    { name: 'ul-clab-1', ip: '10.83.12.237' },
+  ];
   
   /**
    * Get an authentication token from the containerlab API
@@ -64,7 +65,7 @@ const ClabServers = ({ user }) => {
         },
         body: JSON.stringify({
           username: user?.username || 'admin',
-          password: 'ul678clab'  // Shared password for all users
+          password: 'ul678clab'
         }),
       });
       
@@ -153,13 +154,9 @@ const ClabServers = ({ user }) => {
           return null;
         }
         
-        // Prioritize absLabPath over labPath to ensure we have the full path
-        const fullPath = firstNode.absLabPath || firstNode.labPath;
-        console.log(`Lab ${labName} - labPath: ${firstNode.labPath}, absLabPath: ${firstNode.absLabPath}, using: ${fullPath}`);
-        
         return {
           topology: labName,
-          labPath: fullPath,
+          labPath: firstNode.labPath || firstNode.absLabPath,
           labName: firstNode.lab_name,
           labOwner: firstNode.owner,
           status: firstNode.status || 'N/A', // Add status from the first node
@@ -321,13 +318,9 @@ const ClabServers = ({ user }) => {
             if (!nodes || nodes.length === 0) return null;
             
             const firstNode = nodes[0];
-            // Prioritize absLabPath over labPath to ensure we have the full path
-            const fullPath = firstNode.absLabPath || firstNode.labPath;
-            console.log(`All Labs ${labName} - labPath: ${firstNode.labPath}, absLabPath: ${firstNode.absLabPath}, using: ${fullPath}`);
-            
             return {
               topology: labName,
-              labPath: fullPath,
+              labPath: firstNode.labPath || firstNode.absLabPath,
               labName: firstNode.lab_name,
               labOwner: firstNode.owner,
               status: firstNode.status || 'N/A', // Add status from the first node
@@ -439,13 +432,9 @@ const ClabServers = ({ user }) => {
             })
             .map(([labName, nodes]) => {
               const firstNode = nodes[0];
-              // Prioritize absLabPath over labPath to ensure we have the full path
-              const fullPath = firstNode.absLabPath || firstNode.labPath;
-              console.log(`My Lab ${labName} - labPath: ${firstNode.labPath}, absLabPath: ${firstNode.absLabPath}, using: ${fullPath}`);
-              
               return {
                 topology: labName,
-                labPath: fullPath,
+                labPath: firstNode.labPath || firstNode.absLabPath,
                 labName: firstNode.lab_name,
                 labOwner: firstNode.owner,
                 status: firstNode.status || 'N/A', // Add status from the first node
@@ -557,8 +546,10 @@ const ClabServers = ({ user }) => {
           </tr>
         </thead>
         <tbody>
-          {/* Server list is loaded from centralized config */}
-          {getServersWithStatus().map((server) => (
+          {/* This is a list of servers to display in the table. Right now it is hardcoded, any changes to the servers will need to be made here. */}
+          {[
+            { name: 'ul-clab-1', ip: '10.83.12.237', status: 'active' }
+          ].map((server) => (
             <tr key={server.name} className="hover:bg-gray-50">
               <td className="border border-gray-200 px-4 py-2">
                 <div className="server-info">
@@ -734,7 +725,7 @@ const ClabServers = ({ user }) => {
                                 if (window.confirm('Are you sure you want to reconfigure this topology?')) {
                                   try {
                                     setOperationTitle('Reconfiguring Topology');
-                                    setOperationLogs('Starting reconfiguration...\n');
+                                    setOperationLogs('');
                                     setShowLogModal(true);
                                     console.log("Sending reconfigure request:", {
                                       serverIp: serverIp,
@@ -742,41 +733,20 @@ const ClabServers = ({ user }) => {
                                     });
                                     
                                     // Get authentication token
-                                    setOperationLogs(prev => prev + '\nLogging in to containerlab API...\n');
                                     const token = await getAuthToken(serverIp);
-                                    setOperationLogs(prev => prev + 'Successfully logged in to containerlab API\n');
                                     
-                                    // Use the simpler approach with topologySourceUrl (local file path works!)
-                                    console.log('Using topology file path:', topology.labPath);
-                                    setOperationLogs(prev => prev + `\nPreparing to reconfigure topology: ${topology.topology}\n`);
-                                    setOperationLogs(prev => prev + `Using topology file: ${topology.labPath}\n`);
-                                    
-                                    const requestBody = {
-                                      topologySourceUrl: topology.labPath
-                                    };
-                                    console.log('Request body to send:', requestBody);
-                                    
-                                    // Start a progress indicator to show reconfiguration is ongoing
-                                    setOperationLogs(prev => prev + '\nReconfiguration in progress. This might take a few minutes...\n');
-                                    
-                                    // Set up a progress indicator that updates every 5 seconds
-                                    const progressInterval = setInterval(() => {
-                                      setOperationLogs(prev => prev + '• Still working on reconfiguration, please wait...\n');
-                                    }, 5000);
-                                    
-                                    try {
-                                      // This is the API call to reconfigure the topology using the direct containerlab API
-                                      const response = await fetch(`/api/v1/labs?reconfigure=true`, {
-                                        method: 'POST',
-                                        headers: {
-                                          'Content-Type': 'application/json',
-                                          'Authorization': `Bearer ${token}`
-                                        },
-                                        body: JSON.stringify(requestBody),
-                                      });
-                                      
-                                      // Clear the progress indicator once we get a response
-                                      clearInterval(progressInterval);
+                                    // This is the API call to reconfigure the topology using the direct containerlab API
+                                    const response = await fetch(`/api/v1/labs/deploy`, {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                        'Authorization': `Bearer ${token}`
+                                      },
+                                      body: JSON.stringify({
+                                        topo_file: topology.labPath,
+                                        reconfigure: true
+                                      }),
+                                    });
 
                                     // Read the streaming response
                                     const reader = response.body.getReader();
@@ -811,27 +781,20 @@ const ClabServers = ({ user }) => {
                                       }
                                     }
 
-                                      // Check if response was successful
-                                      if (response.ok) {
-                                        setOperationLogs(prev => prev + '\nReconfiguration completed successfully!\n');
-                                        setTimeout(() => {
-                                          setShowLogModal(true);
-                                          alert('Topology reconfigured successfully');
-                                          fetchAllTopologies();
-                                        }, 2000);
-                                      } else {
-                                        setOperationLogs(prev => prev + `\nReconfiguration failed: ${finalJsonStr || response.statusText}\n`);
-                                        alert(`Failed to reconfigure topology: ${finalJsonStr || response.statusText}`);
-                                      }
-                                    } catch (error) {
-                                      // Make sure to clear the interval if there's an error
-                                      clearInterval(progressInterval);
-                                      throw error;
+                                    // Check if response was successful
+                                    if (response.ok) {
+                                      setTimeout(() => {
+                                        setShowLogModal(true);
+                                        alert('Topology reconfigured successfully');
+                                        fetchAllTopologies();
+                                      }, 2000);
+                                    } else {
+                                      alert(`Failed to reconfigure topology: ${finalJsonStr || response.statusText}`);
                                     }
                                   } catch (error) {
                                     console.error('Error reconfiguring topology:', error);
-                                    setOperationLogs(prev => prev + `\nError: ${error.message}`);
                                     alert(`Error reconfiguring topology: ${error.message}`);
+                                    setShowLogModal(false);
                                   }
                                 }
                               }}

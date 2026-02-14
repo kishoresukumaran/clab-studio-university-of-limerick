@@ -1811,7 +1811,7 @@ const App = ({ user, parentSetMode }) => {
               },
               body: JSON.stringify({
                 username: user?.username,
-                password: 'arastra'
+                password: 'ul678clab'
               })
             });
             
@@ -1916,7 +1916,7 @@ const App = ({ user, parentSetMode }) => {
         },
         body: JSON.stringify({
           username: user?.username,
-          password: 'arastra'
+          password: 'ul678clab'
         })
       });
 
@@ -2118,7 +2118,7 @@ const App = ({ user, parentSetMode }) => {
         },
         body: JSON.stringify({
           username: user?.username,
-          password: 'arastra'
+          password: 'ul678clab'
         })
       });
 
