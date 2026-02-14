@@ -292,6 +292,40 @@ const App = ({ user, parentSetMode }) => {
   const [modalType, setModalType] = useState("create");
   const [nodeIpv6MgmtIp, setNodeIpv6MgmtIp] = useState("");
 
+  // Generate topology modal states
+  const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
+  const [numberOfTiers, setNumberOfTiers] = useState('2');
+  const [numberOfSpines, setNumberOfSpines] = useState('');
+  const [numberOfLeafs, setNumberOfLeafs] = useState('');
+  const [numberOfSuperSpines, setNumberOfSuperSpines] = useState('');
+  const [generateEosVersion, setGenerateEosVersion] = useState('');
+  const [generateEosVersionError, setGenerateEosVersionError] = useState('');
+  const [generateSuperSpinesError, setGenerateSuperSpinesError] = useState('');
+  const [generateSpinesError, setGenerateSpinesError] = useState('');
+  const [generateLeafsError, setGenerateLeafsError] = useState('');
+  const [spinesInMlag, setSpinesInMlag] = useState(false);
+  const [leafsInMlag, setLeafsInMlag] = useState(false);
+  const [addHosts, setAddHosts] = useState(false);
+  const [numberOfHosts, setNumberOfHosts] = useState('');
+  const [hostsError, setHostsError] = useState('');
+  const [hostParents, setHostParents] = useState({});
+  const [hostParentErrors, setHostParentErrors] = useState({});
+  const [useDefaultPrefix, setUseDefaultPrefix] = useState(true);
+  const [tier1Prefix, setTier1Prefix] = useState('');
+  const [tier2Prefix, setTier2Prefix] = useState('');
+  const [tier3Prefix, setTier3Prefix] = useState('');
+  const [tierPrefixErrors, setTierPrefixErrors] = useState({});
+  const [addStartupConfig, setAddStartupConfig] = useState(false);
+  const [applyStartupConfigToAll, setApplyStartupConfigToAll] = useState(true);
+  const [generateStartupConfigPath, setGenerateStartupConfigPath] = useState('');
+  const [generateStartupConfigError, setGenerateStartupConfigError] = useState('');
+  const [selectedDevicesForStartupConfig, setSelectedDevicesForStartupConfig] = useState({ superSpines: [], spines: [], leafs: [], hosts: [] });
+  const [addBinds, setAddBinds] = useState(false);
+  const [applyBindsToAll, setApplyBindsToAll] = useState(true);
+  const [generateBinds, setGenerateBinds] = useState([{ source: '', target: '' }]);
+  const [generateBindsErrors, setGenerateBindsErrors] = useState([]);
+  const [selectedDevicesForBinds, setSelectedDevicesForBinds] = useState({ superSpines: [], spines: [], leafs: [], hosts: [] });
+
   // Add state for YAML editor toggle
   const [isYamlEditorCollapsed, setIsYamlEditorCollapsed] = useState(() => {
     // Load from localStorage if available, default to true (collapsed)
@@ -654,6 +688,404 @@ const App = ({ user, parentSetMode }) => {
     },
     [yamlOutput, showMgmt, validateMgmtSettings, topologyName]
   );
+
+  /* Helper function to check if number is even */
+  const isEvenNumber = (numStr) => {
+    const num = parseInt(numStr);
+    return !isNaN(num) && num > 0 && num % 2 === 0;
+  };
+
+  /* Handler for Generate button click */
+  const onGenerateClick = useCallback(() => {
+    setNumberOfTiers('2');
+    setNumberOfSpines('');
+    setNumberOfLeafs('');
+    setNumberOfSuperSpines('');
+    setGenerateEosVersionError('');
+    setGenerateSuperSpinesError('');
+    setGenerateSpinesError('');
+    setGenerateLeafsError('');
+    setSpinesInMlag(false);
+    setLeafsInMlag(false);
+    setAddHosts(false);
+    setNumberOfHosts('');
+    setHostsError('');
+    setHostParents({});
+    setHostParentErrors({});
+    setUseDefaultPrefix(true);
+    setTier1Prefix('');
+    setTier2Prefix('');
+    setTier3Prefix('');
+    setTierPrefixErrors({});
+    setAddStartupConfig(false);
+    setApplyStartupConfigToAll(true);
+    setGenerateStartupConfigPath('');
+    setGenerateStartupConfigError('');
+    setSelectedDevicesForStartupConfig({ superSpines: [], spines: [], leafs: [], hosts: [] });
+    setAddBinds(false);
+    setApplyBindsToAll(true);
+    setGenerateBinds([{ source: '', target: '' }]);
+    setGenerateBindsErrors([]);
+    setSelectedDevicesForBinds({ superSpines: [], spines: [], leafs: [], hosts: [] });
+    const ceosOptions = imageOptions.filter(option => option.kind === 'ceos');
+    setGenerateEosVersion(ceosOptions[0] ? ceosOptions[0].value : 'ceos:4.34.0F');
+    setIsGenerateModalOpen(true);
+  }, [imageOptions]);
+
+  /* Validation handlers for Generate modal inputs */
+  const handleSuperSpinesChange = (e) => {
+    const value = e.target.value;
+    setNumberOfSuperSpines(value);
+    const num = parseInt(value);
+    if (value && (isNaN(num) || num < 1)) {
+      setGenerateSuperSpinesError('Please enter a valid number (minimum 1)');
+    } else if (num > 8) {
+      setGenerateSuperSpinesError('Maximum number of super spines is 8');
+    } else {
+      setGenerateSuperSpinesError('');
+    }
+  };
+
+  const handleSpinesChange = (e) => {
+    const value = e.target.value;
+    setNumberOfSpines(value);
+    const num = parseInt(value);
+    if (value && (isNaN(num) || num < 1)) {
+      setGenerateSpinesError('Please enter a valid number (minimum 1)');
+    } else if (num > 16) {
+      setGenerateSpinesError('Maximum number of spines is 16');
+    } else {
+      setGenerateSpinesError('');
+    }
+    if (!isEvenNumber(value)) setSpinesInMlag(false);
+  };
+
+  const handleLeafsChange = (e) => {
+    const value = e.target.value;
+    setNumberOfLeafs(value);
+    const num = parseInt(value);
+    if (value && (isNaN(num) || num < 1)) {
+      setGenerateLeafsError('Please enter a valid number (minimum 1)');
+    } else if (num > 32) {
+      setGenerateLeafsError('Maximum number of leafs is 32');
+    } else {
+      setGenerateLeafsError('');
+    }
+    if (!isEvenNumber(value)) setLeafsInMlag(false);
+    if (!(num > 0)) {
+      setAddHosts(false);
+      setNumberOfHosts('');
+      setHostParents({});
+      setHostsError('');
+      setHostParentErrors({});
+    }
+    if (addHosts && Object.keys(hostParents).length > 0 && num > 0) {
+      const newHostParents = {};
+      Object.entries(hostParents).forEach(([hostName, parents]) => {
+        newHostParents[hostName] = parents.filter(p => {
+          const leafNum = parseInt(p.replace('leaf', ''));
+          return leafNum <= num;
+        });
+      });
+      setHostParents(newHostParents);
+    }
+  };
+
+  const handleHostsChange = (e) => {
+    const value = e.target.value;
+    setNumberOfHosts(value);
+    const num = parseInt(value);
+    if (value && (isNaN(num) || num < 1)) {
+      setHostsError('Please enter a valid number (minimum 1)');
+    } else if (num > 32) {
+      setHostsError('Maximum number of hosts is 32');
+    } else {
+      setHostsError('');
+    }
+    if (num > 0) {
+      const newHostParents = {};
+      for (let i = 1; i <= num; i++) {
+        const hostName = `host${i}`;
+        newHostParents[hostName] = hostParents[hostName] || [];
+      }
+      setHostParents(newHostParents);
+      setHostParentErrors({});
+    } else {
+      setHostParents({});
+      setHostParentErrors({});
+    }
+  };
+
+  const handleHostParentChange = (hostName, event) => {
+    const selectedOptions = Array.from(event.target.selectedOptions, option => option.value);
+    setHostParents(prev => ({ ...prev, [hostName]: selectedOptions }));
+    if (selectedOptions.length > 0) {
+      setHostParentErrors(prev => { const n = {...prev}; delete n[hostName]; return n; });
+    }
+  };
+
+  const hasAnyDevices = () => {
+    const spines = parseInt(numberOfSpines) || 0;
+    const leafs = parseInt(numberOfLeafs) || 0;
+    const superSpines = numberOfTiers === '3' ? (parseInt(numberOfSuperSpines) || 0) : 0;
+    return spines > 0 || leafs > 0 || superSpines > 0;
+  };
+
+  const areAllDevicesSelected = (tier, count, prefix) => {
+    const currentSelected = selectedDevicesForStartupConfig[tier] || [];
+    if (currentSelected.length !== count) return false;
+    for (let i = 1; i <= count; i++) {
+      if (!currentSelected.includes(`${prefix}${i}`)) return false;
+    }
+    return true;
+  };
+
+  const handleSelectAllTier = (tier, count, prefix) => {
+    const allSelected = areAllDevicesSelected(tier, count, prefix);
+    if (allSelected) {
+      setSelectedDevicesForStartupConfig(prev => ({ ...prev, [tier]: [] }));
+    } else {
+      const allDevices = [];
+      for (let i = 1; i <= count; i++) allDevices.push(`${prefix}${i}`);
+      setSelectedDevicesForStartupConfig(prev => ({ ...prev, [tier]: allDevices }));
+    }
+  };
+
+  const handleDeviceToggleForStartupConfig = (tier, deviceName) => {
+    setSelectedDevicesForStartupConfig(prev => {
+      const current = prev[tier] || [];
+      const isSelected = current.includes(deviceName);
+      return { ...prev, [tier]: isSelected ? current.filter(d => d !== deviceName) : [...current, deviceName] };
+    });
+  };
+
+  const capitalizeFirstLetter = (str) => {
+    if (!str) return '';
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  };
+
+  const getTierDisplayLabel = (tierType) => {
+    if (useDefaultPrefix) {
+      if (tierType === 'superspine') return 'Super Spines';
+      if (tierType === 'spine') return 'Spines';
+      if (tierType === 'leaf') return 'Leafs';
+    } else {
+      if (tierType === 'superspine' && tier1Prefix.trim()) return capitalizeFirstLetter(tier1Prefix.trim());
+      if (tierType === 'spine') {
+        const prefix = numberOfTiers === '3' ? tier2Prefix : tier1Prefix;
+        return prefix.trim() ? capitalizeFirstLetter(prefix.trim()) : 'Spines';
+      }
+      if (tierType === 'leaf') {
+        const prefix = numberOfTiers === '3' ? tier3Prefix : tier2Prefix;
+        return prefix.trim() ? capitalizeFirstLetter(prefix.trim()) : 'Leafs';
+      }
+    }
+    if (tierType === 'superspine') return 'Super Spines';
+    if (tierType === 'spine') return 'Spines';
+    return 'Leafs';
+  };
+
+  const validatePrefix = (prefix) => {
+    if (!prefix || prefix.trim() === '') return 'Prefix is required';
+    if (!/^[a-zA-Z]/.test(prefix)) return 'Prefix must start with a letter';
+    if (!/^[a-zA-Z][a-zA-Z0-9-]*$/.test(prefix)) return 'Only letters, numbers and hyphens allowed';
+    if (prefix.length > 20) return 'Prefix must be 20 characters or less';
+    return null;
+  };
+
+  const handleTierPrefixChange = (tier, value) => {
+    if (tier === 'tier1') setTier1Prefix(value);
+    else if (tier === 'tier2') setTier2Prefix(value);
+    else if (tier === 'tier3') setTier3Prefix(value);
+    const error = validatePrefix(value);
+    setTierPrefixErrors(prev => {
+      const n = {...prev};
+      if (error) n[tier] = error; else delete n[tier];
+      return n;
+    });
+  };
+
+  const handleAddGenerateBind = () => {
+    setGenerateBinds([...generateBinds, { source: '', target: '' }]);
+    setGenerateBindsErrors([...generateBindsErrors, { source: '', target: '' }]);
+  };
+
+  const handleRemoveGenerateBind = (index) => {
+    const newBinds = [...generateBinds]; newBinds.splice(index, 1); setGenerateBinds(newBinds);
+    const newErrors = [...generateBindsErrors]; newErrors.splice(index, 1); setGenerateBindsErrors(newErrors);
+  };
+
+  const handleGenerateBindChange = (index, field, value) => {
+    const newBinds = [...generateBinds]; newBinds[index][field] = value; setGenerateBinds(newBinds);
+    const newErrors = [...generateBindsErrors];
+    if (!newErrors[index]) newErrors[index] = { source: '', target: '' };
+    newErrors[index][field] = value.trim() === '' ? `${field === 'source' ? 'Source' : 'Target'} path is required` : '';
+    setGenerateBindsErrors(newErrors);
+  };
+
+  const handleDeviceToggleForBinds = (tier, deviceName) => {
+    setSelectedDevicesForBinds(prev => {
+      const current = prev[tier] || [];
+      const isSelected = current.includes(deviceName);
+      return { ...prev, [tier]: isSelected ? current.filter(n => n !== deviceName) : [...current, deviceName] };
+    });
+  };
+
+  const handleSelectAllTierForBinds = (tier, count, prefix) => {
+    const allDevices = Array.from({ length: count }, (_, i) => `${prefix}${i + 1}`);
+    const current = selectedDevicesForBinds[tier] || [];
+    const allSelected = allDevices.every(d => current.includes(d));
+    setSelectedDevicesForBinds(prev => ({ ...prev, [tier]: allSelected ? [] : allDevices }));
+  };
+
+  const areAllDevicesSelectedForBinds = (tier, count, prefix) => {
+    const allDevices = Array.from({ length: count }, (_, i) => `${prefix}${i + 1}`);
+    const current = selectedDevicesForBinds[tier] || [];
+    return allDevices.length > 0 && allDevices.every(d => current.includes(d));
+  };
+
+  /* Generate YAML for topology based on tier configuration */
+  const generateTopologyYaml = (tiers, superSpines, spines, leafs, eosVersion, spinesInMlagVal, leafsInMlagVal, hosts, hostParentsVal, useDefaultPrefixVal, customPrefixes) => {
+    const yamlObject = { name: generateRandomName(), topology: { nodes: {}, links: [] } };
+    let superSpinePrefix, spinePrefix, leafPrefix;
+    if (useDefaultPrefixVal) {
+      if (tiers === '3') { superSpinePrefix = 'superspine'; spinePrefix = 'spine'; leafPrefix = 'leaf'; }
+      else { spinePrefix = 'spine'; leafPrefix = 'leaf'; }
+    } else {
+      if (tiers === '3') { superSpinePrefix = customPrefixes.tier1; spinePrefix = customPrefixes.tier2; leafPrefix = customPrefixes.tier3; }
+      else { spinePrefix = customPrefixes.tier1; leafPrefix = customPrefixes.tier2; }
+    }
+    const interfaceCounters = {};
+    const getNextInterface = (nodeName) => {
+      if (!interfaceCounters[nodeName]) interfaceCounters[nodeName] = 1;
+      return `eth${interfaceCounters[nodeName]++}`;
+    };
+    const shouldAddStartupConfigFn = (nodeName, nodeType) => {
+      if (!addStartupConfig) return false;
+      if (applyStartupConfigToAll) return true;
+      return selectedDevicesForStartupConfig[nodeType]?.includes(nodeName) || false;
+    };
+    const shouldAddBindsFn = (nodeName, nodeType) => {
+      if (!addBinds) return false;
+      if (applyBindsToAll) return true;
+      return selectedDevicesForBinds[nodeType]?.includes(nodeName) || false;
+    };
+    const createNode = (nodeName, nodeType) => {
+      yamlObject.topology.nodes[nodeName] = { kind: "ceos", image: eosVersion };
+      if (shouldAddStartupConfigFn(nodeName, nodeType)) {
+        yamlObject.topology.nodes[nodeName]['startup-config'] = generateStartupConfigPath;
+      }
+      if (shouldAddBindsFn(nodeName, nodeType)) {
+        yamlObject.topology.nodes[nodeName].binds = generateBinds
+          .filter(b => b.source && b.target).map(b => `${b.source}:${b.target}`);
+      }
+    };
+    // Create nodes
+    if (tiers === '3') {
+      for (let i = 1; i <= superSpines; i++) createNode(`${superSpinePrefix}${i}`, 'superSpines');
+    }
+    for (let i = 1; i <= spines; i++) createNode(`${spinePrefix}${i}`, 'spines');
+    for (let i = 1; i <= leafs; i++) createNode(`${leafPrefix}${i}`, 'leafs');
+    if (hosts > 0) {
+      for (let i = 1; i <= hosts; i++) createNode(`host${i}`, 'hosts');
+    }
+    // Create links - full mesh
+    if (tiers === '3') {
+      for (let i = 1; i <= superSpines; i++) {
+        for (let j = 1; j <= spines; j++) {
+          const ss = `${superSpinePrefix}${i}`, sp = `${spinePrefix}${j}`;
+          yamlObject.topology.links.push({ endpoints: [`${ss}:${getNextInterface(ss)}`, `${sp}:${getNextInterface(sp)}`] });
+        }
+      }
+    }
+    for (let i = 1; i <= spines; i++) {
+      for (let j = 1; j <= leafs; j++) {
+        const sp = `${spinePrefix}${i}`, lf = `${leafPrefix}${j}`;
+        yamlObject.topology.links.push({ endpoints: [`${sp}:${getNextInterface(sp)}`, `${lf}:${getNextInterface(lf)}`] });
+      }
+    }
+    // MLAG links
+    if (spinesInMlagVal && spines % 2 === 0) {
+      for (let i = 1; i <= spines; i += 2) {
+        const s1 = `${spinePrefix}${i}`, s2 = `${spinePrefix}${i + 1}`;
+        yamlObject.topology.links.push({ endpoints: [`${s1}:${getNextInterface(s1)}`, `${s2}:${getNextInterface(s2)}`] });
+        yamlObject.topology.links.push({ endpoints: [`${s1}:${getNextInterface(s1)}`, `${s2}:${getNextInterface(s2)}`] });
+      }
+    }
+    if (leafsInMlagVal && leafs % 2 === 0) {
+      for (let i = 1; i <= leafs; i += 2) {
+        const l1 = `${leafPrefix}${i}`, l2 = `${leafPrefix}${i + 1}`;
+        yamlObject.topology.links.push({ endpoints: [`${l1}:${getNextInterface(l1)}`, `${l2}:${getNextInterface(l2)}`] });
+        yamlObject.topology.links.push({ endpoints: [`${l1}:${getNextInterface(l1)}`, `${l2}:${getNextInterface(l2)}`] });
+      }
+    }
+    // Host to leaf links
+    if (hosts > 0 && hostParentsVal) {
+      Object.entries(hostParentsVal).forEach(([hostName, parentLeafs]) => {
+        parentLeafs.forEach(leafName => {
+          yamlObject.topology.links.push({ endpoints: [`${hostName}:${getNextInterface(hostName)}`, `${leafName}:${getNextInterface(leafName)}`] });
+        });
+      });
+    }
+    return yaml.dump(yamlObject, { lineWidth: -1, quotingType: '"', forceQuotes: true });
+  };
+
+  /* Handler for Generate modal submit */
+  const handleGenerateSubmit = () => {
+    if (generateEosVersionError || generateSuperSpinesError || generateSpinesError || generateLeafsError || hostsError || generateStartupConfigError) return;
+    if (!generateEosVersion || generateEosVersion === '') { setGenerateEosVersionError('Please select an EOS version'); return; }
+    const spines = parseInt(numberOfSpines) || 0;
+    const leafs = parseInt(numberOfLeafs) || 0;
+    const superSpines = numberOfTiers === '3' ? (parseInt(numberOfSuperSpines) || 0) : 0;
+    if (spines === 0) { setGenerateSpinesError('Please enter number of spines'); return; }
+    if (leafs === 0) { setGenerateLeafsError('Please enter number of leafs'); return; }
+    if (numberOfTiers === '3' && superSpines === 0) { setGenerateSuperSpinesError('Please enter number of super spines'); return; }
+    if (addHosts) {
+      const hosts = parseInt(numberOfHosts) || 0;
+      if (hosts === 0) { setHostsError('Please enter number of hosts'); return; }
+      let hasErrors = false;
+      const newErrors = {};
+      for (let i = 1; i <= hosts; i++) {
+        const hostName = `host${i}`;
+        if (!(hostParents[hostName]?.length > 0)) { newErrors[hostName] = 'Select at least one parent leaf'; hasErrors = true; }
+      }
+      if (hasErrors) { setHostParentErrors(newErrors); return; }
+    }
+    if (!useDefaultPrefix) {
+      let hasErrors = false;
+      const newErrors = {};
+      const t1Err = validatePrefix(tier1Prefix); if (t1Err) { newErrors.tier1 = t1Err; hasErrors = true; }
+      const t2Err = validatePrefix(tier2Prefix); if (t2Err) { newErrors.tier2 = t2Err; hasErrors = true; }
+      if (numberOfTiers === '3') { const t3Err = validatePrefix(tier3Prefix); if (t3Err) { newErrors.tier3 = t3Err; hasErrors = true; } }
+      if (hasErrors) { setTierPrefixErrors(newErrors); return; }
+    }
+    if (addStartupConfig) {
+      if (!generateStartupConfigPath || generateStartupConfigPath.trim() === '') { setGenerateStartupConfigError('Please enter a startup config path'); return; }
+      if (!applyStartupConfigToAll) {
+        const total = (selectedDevicesForStartupConfig.superSpines?.length || 0) + (selectedDevicesForStartupConfig.spines?.length || 0) + (selectedDevicesForStartupConfig.leafs?.length || 0) + (selectedDevicesForStartupConfig.hosts?.length || 0);
+        if (total === 0) { setGenerateStartupConfigError('Please select at least one device'); return; }
+      }
+    }
+    if (addBinds) {
+      const newBindErrors = generateBinds.map(b => ({ source: b.source.trim() === '' ? 'Source path is required' : '', target: b.target.trim() === '' ? 'Target path is required' : '' }));
+      setGenerateBindsErrors(newBindErrors);
+      if (newBindErrors.some(e => e.source || e.target)) return;
+      if (!applyBindsToAll) {
+        const total = (selectedDevicesForBinds.superSpines?.length || 0) + (selectedDevicesForBinds.spines?.length || 0) + (selectedDevicesForBinds.leafs?.length || 0) + (selectedDevicesForBinds.hosts?.length || 0);
+        if (total === 0) { alert('Please select at least one device for binds'); return; }
+      }
+    }
+    try {
+      const generatedYaml = generateTopologyYaml(numberOfTiers, superSpines, spines, leafs, generateEosVersion, spinesInMlag, leafsInMlag, addHosts ? (parseInt(numberOfHosts) || 0) : 0, hostParents, useDefaultPrefix, { tier1: tier1Prefix, tier2: tier2Prefix, tier3: tier3Prefix });
+      handleYamlChange(generatedYaml);
+      setIsGenerateModalOpen(false);
+    } catch (error) {
+      console.error('Error generating topology:', error);
+      alert(`Error generating topology: ${error.message}`);
+    }
+  };
+
+  const handleGenerateClose = () => { setIsGenerateModalOpen(false); };
 
   /* This is the function to update the YAML output of the topology. It is used to update the YAML output of the topology when a node or an edge is added or removed. */
   const updateYaml = (updatedNodes, updatedEdges) => {
@@ -3046,7 +3478,7 @@ const App = ({ user, parentSetMode }) => {
                     onChange={handleTopologyNameChange}
                   />
                 </div>
-                <Sidebar onNodeClick={onNodeClick} />
+                <Sidebar onNodeClick={onNodeClick} onGenerateClick={onGenerateClick} />
 
                 <h3 
                   className="settings-heading" 
@@ -4034,6 +4466,254 @@ const App = ({ user, parentSetMode }) => {
           username={user.username}
           mode="select"
         />
+
+        {/* Generate Topology Modal */}
+        {isGenerateModalOpen && (
+          <div className="modal">
+            <div className="modal-content" style={{ maxWidth: '900px', width: '600px' }}>
+              <h2>Generate Topology</h2>
+              <div className="helper-text" style={{ fontSize: '13px', marginBottom: '15px', padding: '0 10px', lineHeight: '1.5' }}>
+                This will automatically generate a full mesh Clos topology where each spine connects to every leaf.
+                For 3-tier topologies, each super-spine will connect to every spine, and each spine to every leaf.
+              </div>
+              <div className="form-content">
+                <div className="input-group">
+                  <label>Number of Tiers: *</label>
+                  <select value={numberOfTiers} onChange={(e) => { setNumberOfTiers(e.target.value); setUseDefaultPrefix(true); setTier1Prefix(''); setTier2Prefix(''); setTier3Prefix(''); setTierPrefixErrors({}); }} className="image-select">
+                    <option value="2">2 Tiers</option>
+                    <option value="3">3 Tiers</option>
+                  </select>
+                </div>
+
+                <div className="input-group" style={{ marginTop: '10px' }}>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', userSelect: 'none' }}>
+                    <input type="checkbox" checked={useDefaultPrefix} onChange={(e) => { setUseDefaultPrefix(e.target.checked); if (e.target.checked) { setTier1Prefix(''); setTier2Prefix(''); setTier3Prefix(''); setTierPrefixErrors({}); } }} style={{ margin: 0, width: '16px', height: '16px', flexShrink: 0 }} />
+                    <span style={{ fontSize: '14px' }}>{numberOfTiers === '3' ? 'Use default prefix (superspine, spine and leafs)' : 'Use default prefix (spine and leafs)'}</span>
+                  </label>
+                </div>
+
+                {!useDefaultPrefix && (
+                  <div style={{ marginTop: '10px', padding: '15px', border: '1px solid #ddd', borderRadius: '4px', background: '#f9f9f9' }}>
+                    <h4 style={{ marginTop: 0, marginBottom: '10px', fontSize: '14px', fontWeight: 'bold' }}>Custom Tier Prefixes</h4>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead><tr><th style={{ padding: '8px', textAlign: 'left', width: '30%', fontWeight: '600' }}>Tier</th><th style={{ padding: '8px', textAlign: 'left', fontWeight: '600' }}>Prefix *</th></tr></thead>
+                      <tbody>
+                        <tr><td style={{ padding: '8px' }}>Tier 1</td><td style={{ padding: '8px' }}><input type="text" value={tier1Prefix} onChange={(e) => handleTierPrefixChange('tier1', e.target.value)} placeholder={numberOfTiers === '3' ? 'superspine' : 'spine'} className={tierPrefixErrors.tier1 ? 'input-error' : ''} style={{ width: '97%' }} />{tierPrefixErrors.tier1 && <div className="warning-message" style={{ fontSize: '11px', marginTop: '3px' }}>{tierPrefixErrors.tier1}</div>}</td></tr>
+                        <tr><td style={{ padding: '8px' }}>Tier 2</td><td style={{ padding: '8px' }}><input type="text" value={tier2Prefix} onChange={(e) => handleTierPrefixChange('tier2', e.target.value)} placeholder={numberOfTiers === '3' ? 'spine' : 'leaf'} className={tierPrefixErrors.tier2 ? 'input-error' : ''} style={{ width: '97%' }} />{tierPrefixErrors.tier2 && <div className="warning-message" style={{ fontSize: '11px', marginTop: '3px' }}>{tierPrefixErrors.tier2}</div>}</td></tr>
+                        {numberOfTiers === '3' && (<tr><td style={{ padding: '8px' }}>Tier 3</td><td style={{ padding: '8px' }}><input type="text" value={tier3Prefix} onChange={(e) => handleTierPrefixChange('tier3', e.target.value)} placeholder="leaf" className={tierPrefixErrors.tier3 ? 'input-error' : ''} style={{ width: '97%' }} />{tierPrefixErrors.tier3 && <div className="warning-message" style={{ fontSize: '11px', marginTop: '3px' }}>{tierPrefixErrors.tier3}</div>}</td></tr>)}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <div className="input-group">
+                  <label>EOS Version: *</label>
+                  <select value={generateEosVersion} onChange={(e) => { setGenerateEosVersion(e.target.value); if (e.target.value) setGenerateEosVersionError(''); }} className={generateEosVersionError ? 'image-select input-error' : 'image-select'}>
+                    <option value="">Select an EOS version</option>
+                    {imageOptions.filter(o => o.kind === 'ceos').map((option) => (<option key={option.value} value={option.value}>{option.label}</option>))}
+                  </select>
+                  {generateEosVersionError && <div className="warning-message" style={{ marginTop: '5px' }}>{generateEosVersionError}</div>}
+                </div>
+
+                {numberOfTiers === '3' && (
+                  <div className="input-group">
+                    <label>Number of {getTierDisplayLabel('superspine')} (Max: 8):</label>
+                    <input type="number" min="1" max="8" value={numberOfSuperSpines} onChange={handleSuperSpinesChange} placeholder={`Enter number of ${getTierDisplayLabel('superspine').toLowerCase()}`} className={generateSuperSpinesError ? 'input-error' : ''} />
+                    {generateSuperSpinesError && <div className="warning-message" style={{ marginTop: '5px' }}>{generateSuperSpinesError}</div>}
+                  </div>
+                )}
+
+                <div className="input-group">
+                  <label>Number of {getTierDisplayLabel('spine')} (Max: 16):</label>
+                  <input type="number" min="1" max="16" value={numberOfSpines} onChange={handleSpinesChange} placeholder={`Enter number of ${getTierDisplayLabel('spine').toLowerCase()}`} className={generateSpinesError ? 'input-error' : ''} />
+                  {generateSpinesError && <div className="warning-message" style={{ marginTop: '5px' }}>{generateSpinesError}</div>}
+                  <div style={{ marginTop: '10px' }}>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: isEvenNumber(numberOfSpines) ? 'pointer' : 'not-allowed', userSelect: 'none' }} title={`Requires even number of ${getTierDisplayLabel('spine').toLowerCase()}`}>
+                      <input type="checkbox" checked={spinesInMlag} onChange={(e) => setSpinesInMlag(e.target.checked)} disabled={!isEvenNumber(numberOfSpines)} style={{ cursor: isEvenNumber(numberOfSpines) ? 'pointer' : 'not-allowed', margin: 0, flexShrink: 0, width: '16px', height: '16px' }} />
+                      <span style={{ color: isEvenNumber(numberOfSpines) ? 'inherit' : '#999', fontSize: '14px' }}>Are {getTierDisplayLabel('spine').toLowerCase()} in MLAG</span>
+                    </label>
+                    {!isEvenNumber(numberOfSpines) && numberOfSpines && <div className="helper-text" style={{ fontSize: '11px', marginTop: '5px', marginLeft: '24px' }}>MLAG requires even number of {getTierDisplayLabel('spine').toLowerCase()}</div>}
+                  </div>
+                </div>
+
+                <div className="input-group">
+                  <label>Number of {getTierDisplayLabel('leaf')} (Max: 32):</label>
+                  <input type="number" min="1" max="32" value={numberOfLeafs} onChange={handleLeafsChange} placeholder={`Enter number of ${getTierDisplayLabel('leaf').toLowerCase()}`} className={generateLeafsError ? 'input-error' : ''} />
+                  {generateLeafsError && <div className="warning-message" style={{ marginTop: '5px' }}>{generateLeafsError}</div>}
+                  <div style={{ marginTop: '10px' }}>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: isEvenNumber(numberOfLeafs) ? 'pointer' : 'not-allowed', userSelect: 'none' }} title={`Requires even number of ${getTierDisplayLabel('leaf').toLowerCase()}`}>
+                      <input type="checkbox" checked={leafsInMlag} onChange={(e) => setLeafsInMlag(e.target.checked)} disabled={!isEvenNumber(numberOfLeafs)} style={{ cursor: isEvenNumber(numberOfLeafs) ? 'pointer' : 'not-allowed', margin: 0, flexShrink: 0, width: '16px', height: '16px' }} />
+                      <span style={{ color: isEvenNumber(numberOfLeafs) ? 'inherit' : '#999', fontSize: '14px' }}>Are {getTierDisplayLabel('leaf').toLowerCase()} in MLAG</span>
+                    </label>
+                    {!isEvenNumber(numberOfLeafs) && numberOfLeafs && <div className="helper-text" style={{ fontSize: '11px', marginTop: '5px', marginLeft: '24px' }}>MLAG requires even number of {getTierDisplayLabel('leaf').toLowerCase()}</div>}
+                  </div>
+                  <div style={{ marginTop: '10px' }}>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: (parseInt(numberOfLeafs) > 0) ? 'pointer' : 'not-allowed', userSelect: 'none' }}>
+                      <input type="checkbox" checked={addHosts} onChange={(e) => { setAddHosts(e.target.checked); if (!e.target.checked) { setNumberOfHosts(''); setHostParents({}); setHostsError(''); setHostParentErrors({}); } }} disabled={!(parseInt(numberOfLeafs) > 0)} style={{ margin: 0, width: '16px', height: '16px', flexShrink: 0, cursor: (parseInt(numberOfLeafs) > 0) ? 'pointer' : 'not-allowed' }} />
+                      <span style={{ fontSize: '14px', color: (parseInt(numberOfLeafs) > 0) ? 'inherit' : '#999' }}>Add hosts</span>
+                    </label>
+                  </div>
+                </div>
+
+                {addHosts && (
+                  <div className="input-group" style={{ marginTop: '15px' }}>
+                    <label>Number of hosts (Max: 32):</label>
+                    <input type="number" min="1" max="32" value={numberOfHosts} onChange={handleHostsChange} placeholder="Enter number of hosts" className={hostsError ? 'input-error' : ''} />
+                    {hostsError && <div className="warning-message" style={{ marginTop: '5px' }}>{hostsError}</div>}
+                  </div>
+                )}
+
+                {addHosts && parseInt(numberOfHosts) > 0 && parseInt(numberOfLeafs) > 0 && (
+                  <div style={{ marginTop: '15px', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', background: '#f9f9f9' }}>
+                    <h4 style={{ marginTop: 0, marginBottom: '10px', fontSize: '14px', fontWeight: 'bold' }}>Host Connections</h4>
+                    <div className="helper-text" style={{ fontSize: '12px', marginBottom: '10px' }}>Select parent leaf(s) for each host. Hold Ctrl/Cmd for multi-select.</div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead><tr><th style={{ padding: '8px', textAlign: 'left', width: '30%', fontWeight: '600' }}>Host</th><th style={{ padding: '8px', textAlign: 'left', fontWeight: '600' }}>Parent Leafs *</th></tr></thead>
+                      <tbody>
+                        {Array.from({length: parseInt(numberOfHosts)}, (_, i) => {
+                          const hostName = `host${i+1}`;
+                          return (
+                            <tr key={i}>
+                              <td style={{ padding: '8px', fontWeight: '500' }}>{hostName}</td>
+                              <td style={{ padding: '8px' }}>
+                                <select multiple value={hostParents[hostName] || []} onChange={(e) => handleHostParentChange(hostName, e)} className={hostParentErrors[hostName] ? 'input-error' : ''} style={{ width: '100%', minHeight: '70px', padding: '4px', borderRadius: '4px' }}>
+                                  {Array.from({length: parseInt(numberOfLeafs)}, (_, j) => (<option key={j} value={`leaf${j+1}`}>leaf{j+1}</option>))}
+                                </select>
+                                {hostParentErrors[hostName] && <div className="warning-message" style={{ marginTop: '3px', fontSize: '11px' }}>{hostParentErrors[hostName]}</div>}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Startup config checkbox */}
+                <div style={{ marginTop: '20px' }}>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: hasAnyDevices() ? 'pointer' : 'not-allowed', userSelect: 'none' }}>
+                    <input type="checkbox" checked={addStartupConfig} onChange={(e) => { setAddStartupConfig(e.target.checked); if (!e.target.checked) { setApplyStartupConfigToAll(true); setGenerateStartupConfigPath(''); setGenerateStartupConfigError(''); setSelectedDevicesForStartupConfig({ superSpines: [], spines: [], leafs: [], hosts: [] }); } }} disabled={!hasAnyDevices()} style={{ margin: 0, width: '16px', height: '16px', flexShrink: 0, cursor: hasAnyDevices() ? 'pointer' : 'not-allowed' }} />
+                    <span style={{ fontSize: '14px', color: hasAnyDevices() ? 'inherit' : '#999' }}>Add startup config</span>
+                  </label>
+                  {!hasAnyDevices() && <div className="helper-text" style={{ fontSize: '11px', marginTop: '5px', marginLeft: '24px' }}>Enter device counts first</div>}
+                </div>
+
+                {addStartupConfig && (
+                  <div style={{ marginTop: '15px', padding: '15px', border: '1px solid #ddd', borderRadius: '4px', background: '#f9f9f9' }}>
+                    <div style={{ marginBottom: '15px' }}>
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', userSelect: 'none' }}>
+                        <input type="checkbox" checked={applyStartupConfigToAll} onChange={(e) => { setApplyStartupConfigToAll(e.target.checked); if (e.target.checked) setSelectedDevicesForStartupConfig({ superSpines: [], spines: [], leafs: [], hosts: [] }); }} style={{ margin: 0, width: '16px', height: '16px', flexShrink: 0 }} />
+                        <span style={{ fontSize: '14px', fontWeight: '500' }}>Apply to all devices</span>
+                      </label>
+                    </div>
+                    <div className="input-group">
+                      <label>Startup config path: *</label>
+                      <input type="text" value={generateStartupConfigPath} placeholder="Path to startup config" onChange={(e) => { setGenerateStartupConfigPath(e.target.value); if (e.target.value.trim()) setGenerateStartupConfigError(''); }} className={generateStartupConfigError ? 'input-error' : ''} style={{ width: '100%' }} />
+                      {generateStartupConfigError && <div className="warning-message" style={{ marginTop: '5px' }}>{generateStartupConfigError}</div>}
+                    </div>
+                    {!applyStartupConfigToAll && (
+                      <div style={{ marginTop: '15px' }}>
+                        <h4 style={{ marginTop: 0, marginBottom: '10px', fontSize: '14px', fontWeight: 'bold' }}>Select devices:</h4>
+                        {numberOfTiers === '3' && parseInt(numberOfSuperSpines) > 0 && (
+                          <div style={{ marginBottom: '15px', padding: '12px', background: '#fff', borderRadius: '4px', border: '1px solid #e0e0e0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}><strong style={{ fontSize: '13px' }}>{getTierDisplayLabel('superspine')}:</strong><button type="button" onClick={() => { const p = useDefaultPrefix ? 'superspine' : tier1Prefix; handleSelectAllTier('superSpines', parseInt(numberOfSuperSpines), p); }} style={{ fontSize: '12px', padding: '4px 8px' }}>{(() => { const p = useDefaultPrefix ? 'superspine' : tier1Prefix; return areAllDevicesSelected('superSpines', parseInt(numberOfSuperSpines), p) ? 'Deselect All' : 'Select All'; })()}</button></div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
+                              {Array.from({ length: parseInt(numberOfSuperSpines) }, (_, i) => { const p = useDefaultPrefix ? 'superspine' : tier1Prefix; const d = `${p}${i+1}`; const s = selectedDevicesForStartupConfig.superSpines?.includes(d); return (<label key={d} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 8px', borderRadius: '3px', background: s ? '#e3f2fd' : 'transparent', cursor: 'pointer' }}><input type="checkbox" checked={s} onChange={() => handleDeviceToggleForStartupConfig('superSpines', d)} style={{ width: '16px', height: '16px' }} /><span style={{ fontSize: '13px' }}>{d}</span></label>); })}
+                            </div>
+                          </div>
+                        )}
+                        {parseInt(numberOfSpines) > 0 && (
+                          <div style={{ marginBottom: '15px', padding: '12px', background: '#fff', borderRadius: '4px', border: '1px solid #e0e0e0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}><strong style={{ fontSize: '13px' }}>{getTierDisplayLabel('spine')}:</strong><button type="button" onClick={() => { const p = numberOfTiers === '3' ? (useDefaultPrefix ? 'spine' : tier2Prefix) : (useDefaultPrefix ? 'spine' : tier1Prefix); handleSelectAllTier('spines', parseInt(numberOfSpines), p); }} style={{ fontSize: '12px', padding: '4px 8px' }}>{(() => { const p = numberOfTiers === '3' ? (useDefaultPrefix ? 'spine' : tier2Prefix) : (useDefaultPrefix ? 'spine' : tier1Prefix); return areAllDevicesSelected('spines', parseInt(numberOfSpines), p) ? 'Deselect All' : 'Select All'; })()}</button></div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
+                              {Array.from({ length: parseInt(numberOfSpines) }, (_, i) => { const p = numberOfTiers === '3' ? (useDefaultPrefix ? 'spine' : tier2Prefix) : (useDefaultPrefix ? 'spine' : tier1Prefix); const d = `${p}${i+1}`; const s = selectedDevicesForStartupConfig.spines?.includes(d); return (<label key={d} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 8px', borderRadius: '3px', background: s ? '#e3f2fd' : 'transparent', cursor: 'pointer' }}><input type="checkbox" checked={s} onChange={() => handleDeviceToggleForStartupConfig('spines', d)} style={{ width: '16px', height: '16px' }} /><span style={{ fontSize: '13px' }}>{d}</span></label>); })}
+                            </div>
+                          </div>
+                        )}
+                        {parseInt(numberOfLeafs) > 0 && (
+                          <div style={{ marginBottom: '15px', padding: '12px', background: '#fff', borderRadius: '4px', border: '1px solid #e0e0e0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}><strong style={{ fontSize: '13px' }}>{getTierDisplayLabel('leaf')}:</strong><button type="button" onClick={() => { const p = numberOfTiers === '3' ? (useDefaultPrefix ? 'leaf' : tier3Prefix) : (useDefaultPrefix ? 'leaf' : tier2Prefix); handleSelectAllTier('leafs', parseInt(numberOfLeafs), p); }} style={{ fontSize: '12px', padding: '4px 8px' }}>{(() => { const p = numberOfTiers === '3' ? (useDefaultPrefix ? 'leaf' : tier3Prefix) : (useDefaultPrefix ? 'leaf' : tier2Prefix); return areAllDevicesSelected('leafs', parseInt(numberOfLeafs), p) ? 'Deselect All' : 'Select All'; })()}</button></div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
+                              {Array.from({ length: parseInt(numberOfLeafs) }, (_, i) => { const p = numberOfTiers === '3' ? (useDefaultPrefix ? 'leaf' : tier3Prefix) : (useDefaultPrefix ? 'leaf' : tier2Prefix); const d = `${p}${i+1}`; const s = selectedDevicesForStartupConfig.leafs?.includes(d); return (<label key={d} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 8px', borderRadius: '3px', background: s ? '#e3f2fd' : 'transparent', cursor: 'pointer' }}><input type="checkbox" checked={s} onChange={() => handleDeviceToggleForStartupConfig('leafs', d)} style={{ width: '16px', height: '16px' }} /><span style={{ fontSize: '13px' }}>{d}</span></label>); })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Binds checkbox */}
+                <div style={{ marginTop: '20px' }}>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: hasAnyDevices() ? 'pointer' : 'not-allowed', userSelect: 'none' }}>
+                    <input type="checkbox" checked={addBinds} onChange={(e) => { setAddBinds(e.target.checked); if (!e.target.checked) { setApplyBindsToAll(true); setGenerateBinds([{ source: '', target: '' }]); setGenerateBindsErrors([]); setSelectedDevicesForBinds({ superSpines: [], spines: [], leafs: [], hosts: [] }); } }} disabled={!hasAnyDevices()} style={{ margin: 0, width: '16px', height: '16px', flexShrink: 0, cursor: hasAnyDevices() ? 'pointer' : 'not-allowed' }} />
+                    <span style={{ fontSize: '14px', color: hasAnyDevices() ? 'inherit' : '#999' }}>Add binds</span>
+                  </label>
+                  {!hasAnyDevices() && <div className="helper-text" style={{ fontSize: '11px', marginTop: '5px', marginLeft: '24px' }}>Enter device counts first</div>}
+                </div>
+
+                {addBinds && (
+                  <div style={{ marginTop: '15px', padding: '15px', border: '1px solid #ddd', borderRadius: '4px', background: '#f9f9f9' }}>
+                    <div style={{ marginBottom: '15px' }}>
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', userSelect: 'none' }}>
+                        <input type="checkbox" checked={applyBindsToAll} onChange={(e) => { setApplyBindsToAll(e.target.checked); if (e.target.checked) setSelectedDevicesForBinds({ superSpines: [], spines: [], leafs: [], hosts: [] }); }} style={{ margin: 0, width: '16px', height: '16px', flexShrink: 0 }} />
+                        <span style={{ fontSize: '14px', fontWeight: '500' }}>Apply to all devices</span>
+                      </label>
+                    </div>
+                    <div className="input-group">
+                      <label>Binds: *</label>
+                      {generateBinds.map((bind, index) => (
+                        <div key={index} style={{ marginBottom: '15px' }}>
+                          <input type="text" value={bind.source} placeholder="Source path" onChange={(e) => handleGenerateBindChange(index, 'source', e.target.value)} className={generateBindsErrors[index]?.source ? 'input-error' : ''} style={{ width: '100%', marginBottom: '5px' }} />
+                          {generateBindsErrors[index]?.source && <div className="warning-message" style={{ marginTop: '2px', marginBottom: '5px' }}>{generateBindsErrors[index].source}</div>}
+                          <input type="text" value={bind.target} placeholder="Target path (e.g., /mnt/flash/token:ro)" onChange={(e) => handleGenerateBindChange(index, 'target', e.target.value)} className={generateBindsErrors[index]?.target ? 'input-error' : ''} style={{ width: '100%', marginBottom: '5px' }} />
+                          {generateBindsErrors[index]?.target && <div className="warning-message" style={{ marginTop: '2px', marginBottom: '5px' }}>{generateBindsErrors[index].target}</div>}
+                          <div style={{ display: 'flex', gap: '10px' }}>
+                            {index === generateBinds.length - 1 && <button type="button" onClick={handleAddGenerateBind} className="add-bind-button">+</button>}
+                            {generateBinds.length > 1 && <button type="button" onClick={() => handleRemoveGenerateBind(index)} className="remove-bind-button">-</button>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {!applyBindsToAll && (
+                      <div style={{ marginTop: '15px' }}>
+                        <h4 style={{ marginTop: 0, marginBottom: '10px', fontSize: '14px', fontWeight: 'bold' }}>Select devices:</h4>
+                        {numberOfTiers === '3' && parseInt(numberOfSuperSpines) > 0 && (
+                          <div style={{ marginBottom: '15px', padding: '12px', background: '#fff', borderRadius: '4px', border: '1px solid #e0e0e0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}><strong style={{ fontSize: '13px' }}>{getTierDisplayLabel('superspine')}:</strong><button type="button" onClick={() => { const p = useDefaultPrefix ? 'superspine' : tier1Prefix; handleSelectAllTierForBinds('superSpines', parseInt(numberOfSuperSpines), p); }} style={{ fontSize: '12px', padding: '4px 8px' }}>{(() => { const p = useDefaultPrefix ? 'superspine' : tier1Prefix; return areAllDevicesSelectedForBinds('superSpines', parseInt(numberOfSuperSpines), p) ? 'Deselect All' : 'Select All'; })()}</button></div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
+                              {Array.from({ length: parseInt(numberOfSuperSpines) }, (_, i) => { const p = useDefaultPrefix ? 'superspine' : tier1Prefix; const d = `${p}${i+1}`; const s = selectedDevicesForBinds.superSpines?.includes(d); return (<label key={d} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 8px', borderRadius: '3px', background: s ? '#e3f2fd' : 'transparent', cursor: 'pointer' }}><input type="checkbox" checked={s} onChange={() => handleDeviceToggleForBinds('superSpines', d)} style={{ width: '16px', height: '16px' }} /><span style={{ fontSize: '13px' }}>{d}</span></label>); })}
+                            </div>
+                          </div>
+                        )}
+                        {parseInt(numberOfSpines) > 0 && (
+                          <div style={{ marginBottom: '15px', padding: '12px', background: '#fff', borderRadius: '4px', border: '1px solid #e0e0e0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}><strong style={{ fontSize: '13px' }}>{getTierDisplayLabel('spine')}:</strong><button type="button" onClick={() => { const p = numberOfTiers === '3' ? (useDefaultPrefix ? 'spine' : tier2Prefix) : (useDefaultPrefix ? 'spine' : tier1Prefix); handleSelectAllTierForBinds('spines', parseInt(numberOfSpines), p); }} style={{ fontSize: '12px', padding: '4px 8px' }}>{(() => { const p = numberOfTiers === '3' ? (useDefaultPrefix ? 'spine' : tier2Prefix) : (useDefaultPrefix ? 'spine' : tier1Prefix); return areAllDevicesSelectedForBinds('spines', parseInt(numberOfSpines), p) ? 'Deselect All' : 'Select All'; })()}</button></div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
+                              {Array.from({ length: parseInt(numberOfSpines) }, (_, i) => { const p = numberOfTiers === '3' ? (useDefaultPrefix ? 'spine' : tier2Prefix) : (useDefaultPrefix ? 'spine' : tier1Prefix); const d = `${p}${i+1}`; const s = selectedDevicesForBinds.spines?.includes(d); return (<label key={d} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 8px', borderRadius: '3px', background: s ? '#e3f2fd' : 'transparent', cursor: 'pointer' }}><input type="checkbox" checked={s} onChange={() => handleDeviceToggleForBinds('spines', d)} style={{ width: '16px', height: '16px' }} /><span style={{ fontSize: '13px' }}>{d}</span></label>); })}
+                            </div>
+                          </div>
+                        )}
+                        {parseInt(numberOfLeafs) > 0 && (
+                          <div style={{ marginBottom: '15px', padding: '12px', background: '#fff', borderRadius: '4px', border: '1px solid #e0e0e0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}><strong style={{ fontSize: '13px' }}>{getTierDisplayLabel('leaf')}:</strong><button type="button" onClick={() => { const p = numberOfTiers === '3' ? (useDefaultPrefix ? 'leaf' : tier3Prefix) : (useDefaultPrefix ? 'leaf' : tier2Prefix); handleSelectAllTierForBinds('leafs', parseInt(numberOfLeafs), p); }} style={{ fontSize: '12px', padding: '4px 8px' }}>{(() => { const p = numberOfTiers === '3' ? (useDefaultPrefix ? 'leaf' : tier3Prefix) : (useDefaultPrefix ? 'leaf' : tier2Prefix); return areAllDevicesSelectedForBinds('leafs', parseInt(numberOfLeafs), p) ? 'Deselect All' : 'Select All'; })()}</button></div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
+                              {Array.from({ length: parseInt(numberOfLeafs) }, (_, i) => { const p = numberOfTiers === '3' ? (useDefaultPrefix ? 'leaf' : tier3Prefix) : (useDefaultPrefix ? 'leaf' : tier2Prefix); const d = `${p}${i+1}`; const s = selectedDevicesForBinds.leafs?.includes(d); return (<label key={d} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 8px', borderRadius: '3px', background: s ? '#e3f2fd' : 'transparent', cursor: 'pointer' }}><input type="checkbox" checked={s} onChange={() => handleDeviceToggleForBinds('leafs', d)} style={{ width: '16px', height: '16px' }} /><span style={{ fontSize: '13px' }}>{d}</span></label>); })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="actions">
+                <button onClick={handleGenerateSubmit}>Generate</button>
+                <button onClick={handleGenerateClose}>Close</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
   );
 };

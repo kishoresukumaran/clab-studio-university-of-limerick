@@ -1,5 +1,5 @@
 import React from 'react';
-import { Router, GitBranch, HardDrive, Package, Sparkles } from 'lucide-react';
+import { Router, HardDrive, Sparkles } from 'lucide-react';
 
 const Sidebar = ({ onNodeClick, onGenerateClick }) => {
   const onDragStart = (event, nodeType) => {
@@ -15,7 +15,7 @@ const Sidebar = ({ onNodeClick, onGenerateClick }) => {
 
   return (
     <aside>
-      <div className="description"><h3 className="settings-heading">Click or drag to add nodes <span className="info-icon nodes-info">ⓘ</span></h3></div>
+      <div className="description"><h3 className="settings-heading">Click or drag to add nodes</h3></div>
       <div className="node-buttons">
         <div
           className="node"
